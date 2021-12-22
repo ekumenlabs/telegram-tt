@@ -1,7 +1,16 @@
 import SockJS from 'sockjs-client';
-import React, { useEffect, useState, useRef } from '../../../lib/teact/teact';
-import MenuItem from '../../ui/MenuItem';
+import React, {
+  FC, useEffect, useState, useRef, memo,
+} from '../../../lib/teact/teact';
+import { withGlobal } from '../../../lib/teact/teactn';
+
 import { DEBUG } from '../../../config';
+
+import { selectUser } from '../../../modules/selectors';
+
+import { ApiUser } from '../../../api/types';
+
+import MenuItem from '../../ui/MenuItem';
 
 import './Immedia.scss';
 
@@ -28,11 +37,15 @@ type ParticipantsType = {
   image?: string;
 };
 
-type ImmediaProps = {
+type OwnProps = {
   chatId: string;
 };
 
-const Immedia = ({ chatId }: ImmediaProps) => {
+type StateProps = {
+  currentUser?: ApiUser;
+};
+
+const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   // State that tracks when update is being run. Triggers another update after UPDATE_RATE seconds.
   const [lastSnapshot, setLastSnapshot] = useState<string | undefined>(
     undefined,
@@ -150,8 +163,9 @@ const Immedia = ({ chatId }: ImmediaProps) => {
   // Given that they can be undefined maybe it's better to let the user change it.
   useEffect(() => {
     console.log(INIT, 'Setting nickname');
-    setNickname('Matias');
-  }, []);
+    // Add whitespace until data is loaded
+    setNickname(currentUser?.username || '\u00a0\u00a0');
+  }, [currentUser]);
 
   // TODO: Correct true value of messageId. Using callbacks overwrites the value.
   const enableAwareness = () => {
@@ -414,10 +428,7 @@ const Immedia = ({ chatId }: ImmediaProps) => {
                         (participantNickname && (
                           <i className="icon-video-stop"></i>
                         ))} */}
-                    <text className="Nickname">
-                      {/* Add whitespace until data is loaded */}
-                      {participantNickname || '\u00a0\u00a0'}
-                    </text>
+                    <text className="Nickname">{participantNickname}</text>
                   </div>
                 );
               })}
@@ -437,4 +448,12 @@ const Immedia = ({ chatId }: ImmediaProps) => {
   );
 };
 /* eslint-enable no-console */
-export default Immedia;
+export default memo(withGlobal<OwnProps>(
+  (global): StateProps => {
+    const { currentUserId } = global;
+
+    return {
+      currentUser: currentUserId ? selectUser(global, currentUserId) : undefined,
+    };
+  },
+)(Immedia));
