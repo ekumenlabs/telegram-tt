@@ -53,16 +53,29 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const [nickname, setNickname] = useState('');
   const [awareness, setAwareness] = useState(false);
   const [participants, setParticipants] = useState<ParticipantsType[]>([]);
+
   const wsRef = useRef<WebSocket | undefined>(undefined);
+  // eslint-disable-next-line  no-null/no-null
+  const canvasMeRef = useRef<HTMLCanvasElement | null>(null);
+  // eslint-disable-next-line  no-null/no-null
+  const videoMeRef = useRef<HTMLVideoElement | null>(null);
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 
   const cleanUp = () => {
-    console.log(INIT, 'CLEANING UP!');
+    console.log(INIT, 'Cleaning up!');
     setParticipants([]);
     setAwareness(false);
     setLastSnapshot(undefined);
     setUserId(undefined);
+    // TODO: Check how to clean up tracks when user changes chats
+    // FIX: Sometimes it works (i.e., disable webcam light), sometimes it doesn't.
+    if (videoMeRef.current) {
+      if (videoMeRef.current.srcObject) {
+        const tracks = (videoMeRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach((track) => track.stop());
+      }
+    }
     // TODO: We need to also clean up set intervals.
   };
 
@@ -191,7 +204,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
       wsRef.current.send(JSON.stringify(message));
       console.log(INIT, 'Disabled Awareness');
       cleanUp();
-      // TODO: stop video stream
     }
   };
 
@@ -219,19 +231,20 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   useEffect(() => {
     const getSnapshotVideo = () => {
       if (awareness) {
-        const video = document.getElementById('video-me') as HTMLVideoElement;
-        const canvas = document.getElementById(
-          'canvas-me',
-        ) as HTMLCanvasElement;
-        if (canvas) {
-          const context = canvas.getContext('2d');
+        if (canvasMeRef.current) {
+          const context = canvasMeRef.current.getContext('2d');
 
           const cbk = (stream: MediaStream) => {
-            if (video && context) {
-              video.srcObject = stream;
+            if (videoMeRef.current && context) {
+              videoMeRef.current.srcObject = stream;
               // Wait some time beacuse the video is not ready
               // FIX: Maybe there's a better way to do this.
+              // TRY: https://developer.mozilla.org/en-US/docs/Web/API/ImageCapture/ImageCapture
               setTimeout(() => {
+                const video = videoMeRef.current;
+                const canvas = canvasMeRef.current;
+                // eslint-disable-next-line  no-null/no-null
+                if (video === null || canvas === null) return;
                 // show snapshot
                 context.drawImage(
                   video,
@@ -336,7 +349,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     if (lastSnapshot !== undefined && userId !== undefined) {
       let updateInterval: NodeJS.Timeout;
       if (awareness) {
-        console.log(INIT, 'Running Updates');
         updateInterval = setInterval(sendUpdate, UPDATE_RATE);
       }
       return () => clearInterval(updateInterval);
@@ -387,7 +399,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
           <div className="Participants">
             <div key={userId} className="VideoName VideoNameMe">
               <video
-                id="video-me"
+                ref={videoMeRef}
                 autoPlay
                 className="videoStream"
                 width="640"
@@ -396,7 +408,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
                 <track kind="captions" />
               </video>
               <canvas
-                id="canvas-me"
+                ref={canvasMeRef}
                 className="CanvasVideo"
                 width="70"
                 height="50"
