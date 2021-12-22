@@ -53,7 +53,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const [nickname, setNickname] = useState('');
   const [awareness, setAwareness] = useState(false);
   const [participants, setParticipants] = useState<ParticipantsType[]>([]);
-  const ws = useRef<WebSocket | undefined>(undefined);
+  const wsRef = useRef<WebSocket | undefined>(undefined);
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 
@@ -118,18 +118,18 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   }, [chatId]);
 
   const createConnection = () => {
-    ws.current = new SockJS(WEBSOCKET_URL);
-    ws.current.onopen = () => console.log(INIT, 'ws opened');
-    ws.current.onclose = () => {
+    wsRef.current = new SockJS(WEBSOCKET_URL);
+    wsRef.current.onopen = () => console.log(INIT, 'ws opened');
+    wsRef.current.onclose = () => {
       console.log(INIT, 'ws closed');
       // reconnect
       setTimeout(createConnection, 1000);
     };
-    ws.current.onerror = (event) => {
+    wsRef.current.onerror = (event) => {
       console.log(INIT, 'ws error');
       console.log(INIT, event);
       // clean up
-      ws.current = undefined;
+      wsRef.current = undefined;
       cleanUp();
     };
   };
@@ -140,8 +140,8 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   }, []);
 
   useEffect(() => {
-    if (ws.current) {
-      ws.current.onmessage = (event) => {
+    if (wsRef.current) {
+      wsRef.current.onmessage = (event) => {
         const response = JSON.parse(event.data);
         const { data } = response;
         console.log(INIT, 'RECEIVED MESSAGE!');
@@ -163,7 +163,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   // TODO: Correct true value of messageId. Using callbacks overwrites the value.
   const enableAwareness = () => {
-    if (ws.current) {
+    if (wsRef.current) {
       const currentMessageId = messageId + 1;
       setMessageId(currentMessageId);
       const message = {
@@ -172,14 +172,14 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         room: formatRoom(chatId),
         data: { password: false },
       };
-      ws.current.send(JSON.stringify(message));
+      wsRef.current.send(JSON.stringify(message));
       console.log(INIT, 'Enabled Awareness');
       setAwareness(true);
     }
   };
 
   const disableAwareness = () => {
-    if (ws.current) {
+    if (wsRef.current) {
       const currentMessageId = messageId + 1;
       setMessageId(currentMessageId);
       const message = {
@@ -188,7 +188,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         room: formatRoom(chatId),
         type: 'uns',
       };
-      ws.current.send(JSON.stringify(message));
+      wsRef.current.send(JSON.stringify(message));
       console.log(INIT, 'Disabled Awareness');
       cleanUp();
       // TODO: stop video stream
@@ -311,7 +311,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   // async states?
   useEffect(() => {
     const sendUpdate = () => {
-      if (ws.current) {
+      if (wsRef.current) {
         const currentMessageId = messageId + 1;
         setMessageId(currentMessageId);
         const message = {
@@ -330,7 +330,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
           },
         };
         console.log(INIT, 'Updating with message: ', message);
-        ws.current.send(JSON.stringify(message));
+        wsRef.current.send(JSON.stringify(message));
       }
     };
     if (lastSnapshot !== undefined && userId !== undefined) {
@@ -350,7 +350,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   useEffect(() => {
     const ping = () => {
       const type = 'ping';
-      if (ws.current) {
+      if (wsRef.current) {
         const currentMessageId = messageId + 1;
         setMessageId(currentMessageId);
         const message = {
@@ -360,7 +360,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
           data: undefined,
         };
         console.log(INIT, `${type.toUpperCase()}: `, message);
-        ws.current.send(JSON.stringify(message));
+        wsRef.current.send(JSON.stringify(message));
       }
     };
 
