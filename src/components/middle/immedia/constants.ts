@@ -12,7 +12,7 @@ const GC_RATE = 1500; // 1.5 seconds
 const REMOVE_THRESHOLD = 1000 * 20; // 20 seconds
 const SNAPSHOT_RATE = 500; // 0.5 seconds
 const PING_RATE = 1000 * 5; // 5 seconds
-const UPDATE_RATE = 1000 * 5; // 1 second
+const UPDATE_RATE = 1000 * 1; // 1 second
 
 export { WEBSOCKET_URL };
 export { INIT };

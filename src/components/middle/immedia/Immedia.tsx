@@ -378,7 +378,11 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   return (
     <div className="MainImmedia">
       {/* Participants Header */}
-      <div className={`ImmediaHeader custom-scroll ${awareness || 'ImmediaBackground'}`}>
+      <div
+        className={`ImmediaHeader custom-scroll ${
+          awareness || 'ImmediaBackground'
+        }`}
+      >
         {awareness && (
           <div className="Participants">
             <div key={userId} className="VideoName VideoNameMe">
@@ -400,24 +404,23 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
               <text className="Nickname">{nickname}</text>
             </div>
             {participants
-              && participants.map(({ id, nickname: participantNickname }) => {
-                return (
-                  <div key={id} className="VideoName VideoNameParticipants">
-                    <canvas
-                      className="CanvasVideo"
-                      id={`canvas-${id}`}
-                      width="70"
-                      height="50"
-                    />
-                    {/* FIX: Display image in place of canvas */}
-                    {/* {image ||
-                        (participantNickname && (
-                          <i className="icon-video-stop"></i>
-                        ))} */}
-                    <text className="Nickname">{participantNickname}</text>
-                  </div>
-                );
-              })}
+              && participants.map(
+                ({ id, image, nickname: participantNickname }) => {
+                  return image === undefined ? (
+                    <div key={id} className="VideoName" />
+                  ) : (
+                    <div key={id} className="VideoName VideoNameParticipants">
+                      <canvas
+                        className="CanvasVideo"
+                        id={`canvas-${id}`}
+                        width="70"
+                        height="50"
+                      />
+                      <text className="Nickname">{participantNickname}</text>
+                    </div>
+                  );
+                },
+              )}
           </div>
         )}
       </div>
