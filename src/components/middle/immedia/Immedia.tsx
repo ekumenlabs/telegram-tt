@@ -1,10 +1,12 @@
 import SockJS from 'sockjs-client';
 import React, {
-  FC, useEffect, useState, useRef, memo,
+  FC,
+  useEffect,
+  useState,
+  useRef,
+  memo,
 } from '../../../lib/teact/teact';
 import { withGlobal } from '../../../lib/teact/teactn';
-
-import { DEBUG } from '../../../config';
 
 import { selectUser } from '../../../modules/selectors';
 
@@ -12,21 +14,18 @@ import { ApiUser } from '../../../api/types';
 
 import MenuItem from '../../ui/MenuItem';
 
+import {
+  WEBSOCKET_URL, INIT,
+  GC_RATE,
+  REMOVE_THRESHOLD,
+  SNAPSHOT_RATE,
+  PING_RATE,
+  UPDATE_RATE,
+} from './constants';
+
+import { formatRoom } from './helpers';
+
 import './Immedia.scss';
-
-const WEBSOCKET_URL = DEBUG
-  ? 'http://localhost:3000/ws'
-  : 'http://immedia.herokuapp.com/ws';
-// const WEBSOCKET_URL = "http://immedia.herokuapp.com/ws";
-
-// String pre-attached to console.log messages
-const INIT = 'IMMEDIA: ';
-
-const GC_RATE = 1500; // 1.5 seconds
-const REMOVE_THRESHOLD = 1000 * 20; // 20 seconds
-const SNAPSHOT_RATE = 500; // 0.5 seconds
-const PING_RATE = 1000 * 5; // 5 seconds
-const UPDATE_RATE = 1000 * 5; // 1 second
 
 // Let prehook commit with console.logs
 /* eslint-disable no-console */
@@ -58,8 +57,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const ws = useRef<WebSocket | undefined>(undefined);
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
-
-  const formatRoom = (room: string) => room.replace('-', 's');
 
   const cleanUp = () => {
     console.log(INIT, 'CLEANING UP!');
@@ -158,9 +155,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     }
   }, [handleMessage]);
 
-  // Nickname is set when the user leaves a room, correct.
-  // TODO: Set the user first name/ last name or username from Telegram API as nickname.
-  // Given that they can be undefined maybe it's better to let the user change it.
   useEffect(() => {
     console.log(INIT, 'Setting nickname');
     // Add whitespace until data is loaded
@@ -448,12 +442,14 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   );
 };
 /* eslint-enable no-console */
-export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+export default memo(
+  withGlobal<OwnProps>((global): StateProps => {
     const { currentUserId } = global;
 
     return {
-      currentUser: currentUserId ? selectUser(global, currentUserId) : undefined,
+      currentUser: currentUserId
+        ? selectUser(global, currentUserId)
+        : undefined,
     };
-  },
-)(Immedia));
+  })(Immedia),
+);
