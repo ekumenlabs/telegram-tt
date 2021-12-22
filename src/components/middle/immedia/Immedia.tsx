@@ -442,7 +442,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         className="Awareness Button default primary"
         onClick={awareness ? disableAwareness : enableAwareness}
       >
-        {/* {awareness ? <i className="AwarenessIcon icon-close"/> : <i className="AwarenessIcon icon-enter"/>} */}
         {awareness ? 'Disable Awareness' : 'Enable Awareness'}
       </button>
     </div>

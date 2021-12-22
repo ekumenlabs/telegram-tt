@@ -56,13 +56,14 @@
 .Awareness {
   --base-top-pos: 6rem;
   position: absolute;
-  right: max(1rem, env(safe-area-inset-right));
+  right: -9rem;
   top: var(--base-top-pos);
   z-index: var(--z-scroll-down-button);
   width: fit-content;
   text-transform: none;
+  transition: all 0.5s;
+  &:hover {
+    transform: translateX(-140px);
+    transition: transform 0.5s ease-in;
+  }
 }
-
-// .AwarenessIcon {
-//   margin-right: 2px;
-// }
