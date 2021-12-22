@@ -1,9 +1,18 @@
+.MainImmedia {
+  width: 100%;
+}
+
 .ImmediaHeader {
   min-height: 110px;
+  max-height: 180px;
+  background: transparent;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 .ImmediaBackground {
-  background-color: transparent;
+  display: none;
 }
 
 .Participants {
@@ -12,24 +21,24 @@
   flex-wrap: wrap;
 }
 
-.MeParticipant {
-  padding: 2px;
-}
-
 .videoStream {
   display: none;
 }
 
 .VideoName {
-  border: 2px solid var(--color-chat-active);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 2px;
+  margin-right: 3px;
+  margin-bottom: 3px;
+}
+
+.VideoNameMe {
+  border: 2px solid var(--color-chat-active);
 }
 
 .VideoNameParticipants {
-  margin-right: 3px;
   border: 2px solid gray;
 }
 
@@ -44,8 +53,16 @@
   text-align: center;
 }
 
-.OtherParticipants {
-  padding: 2px;
-  display:flex;
-  flex-direction: row;
+.Awareness {
+  --base-top-pos: 6rem;
+  position: absolute;
+  right: max(1rem, env(safe-area-inset-right));
+  top: var(--base-top-pos);
+  z-index: var(--z-scroll-down-button);
+  width: fit-content;
+  text-transform: none;
 }
+
+// .AwarenessIcon {
+//   margin-right: 2px;
+// }

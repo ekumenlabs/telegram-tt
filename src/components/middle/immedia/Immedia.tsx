@@ -12,10 +12,9 @@ import { selectUser } from '../../../modules/selectors';
 
 import { ApiUser } from '../../../api/types';
 
-import MenuItem from '../../ui/MenuItem';
-
 import {
-  WEBSOCKET_URL, INIT,
+  WEBSOCKET_URL,
+  INIT,
   GC_RATE,
   REMOVE_THRESHOLD,
   SNAPSHOT_RATE,
@@ -63,6 +62,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     setParticipants([]);
     setAwareness(false);
     setLastSnapshot(undefined);
+    setUserId(undefined);
     // TODO: We need to also clean up set intervals.
   };
 
@@ -190,9 +190,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
       };
       ws.current.send(JSON.stringify(message));
       console.log(INIT, 'Disabled Awareness');
-      setAwareness(false);
-      setUserId(undefined);
-      setLastSnapshot(undefined);
+      cleanUp();
       // TODO: stop video stream
     }
   };
@@ -378,25 +376,21 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   }, [awareness, userId, messageId, chatId]);
 
   return (
-    <div
-      className={`MiddleHeader ImmediaHeader ${
-        awareness || 'ImmediaBackground'
-      }`}
-    >
-      {/* Participants */}
-      {awareness && (
-        <div className="Participants">
-          <div className="MeParticipant">
-            <video
-              id="video-me"
-              autoPlay
-              className="videoStream"
-              width="640"
-              height="480"
-            >
-              <track kind="captions" />
-            </video>
-            <div className="VideoName">
+    <div className="MainImmedia">
+      {/* Participants Header */}
+      <div className={`ImmediaHeader custom-scroll ${awareness || 'ImmediaBackground'}`}>
+        {awareness && (
+          <div className="Participants">
+            <div key={userId} className="VideoName VideoNameMe">
+              <video
+                id="video-me"
+                autoPlay
+                className="videoStream"
+                width="640"
+                height="480"
+              >
+                <track kind="captions" />
+              </video>
               <canvas
                 id="canvas-me"
                 className="CanvasVideo"
@@ -405,8 +399,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
               />
               <text className="Nickname">{nickname}</text>
             </div>
-          </div>
-          <div className="OtherParticipants">
             {participants
               && participants.map(({ id, nickname: participantNickname }) => {
                 return (
@@ -427,17 +419,17 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
                 );
               })}
           </div>
-        </div>
-      )}
-      {/* Action Buttons */}
-      <div className="HeaderActions">
-        <MenuItem
-          icon={awareness ? 'close' : 'enter'}
-          onClick={awareness ? disableAwareness : enableAwareness}
-        >
-          {awareness ? 'Disable Awareness' : 'Enable Awareness'}
-        </MenuItem>
+        )}
       </div>
+      {/* Action Buttons */}
+      <button
+        type="button"
+        className="Awareness Button default primary"
+        onClick={awareness ? disableAwareness : enableAwareness}
+      >
+        {/* {awareness ? <i className="AwarenessIcon icon-close"/> : <i className="AwarenessIcon icon-enter"/>} */}
+        {awareness ? 'Disable Awareness' : 'Enable Awareness'}
+      </button>
     </div>
   );
 };
