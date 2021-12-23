@@ -1,4 +1,5 @@
 .immedia-presence {
+  position: relative;
   width: 100%;
 }
 
@@ -18,7 +19,7 @@
 .rows {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-evenly;
+  justify-content: flex-start;
 }
 
 .video-me {
@@ -56,10 +57,9 @@
 
 
 .enable-disable-awareness {
-  --base-top-pos: 6rem;
   position: absolute;
+  top: 0;
   right: -9rem;
-  top: var(--base-top-pos);
   z-index: var(--z-scroll-down-button);
   width: fit-content;
   text-transform: none;
