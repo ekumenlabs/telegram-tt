@@ -1,9 +1,10 @@
-import { DEBUG } from '../../../config';
+// import { DEBUG } from '../../../config';
 
-const WEBSOCKET_URL = DEBUG
-  ? 'http://localhost:3000/ws'
-  : 'http://immedia.herokuapp.com/ws';
-// const WEBSOCKET_URL = "http://immedia.herokuapp.com/ws";
+// uncomment for production
+// const WEBSOCKET_URL = DEBUG
+//   ? 'http://localhost:3000/ws'
+//   : 'https://immedia.herokuapp.com/ws';
+const WEBSOCKET_URL = 'https://immedia.herokuapp.com/ws';
 
 // String pre-attached to console.log messages
 const INIT = 'IMMEDIA: ';
