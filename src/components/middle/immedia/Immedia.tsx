@@ -12,6 +12,8 @@ import { selectUser } from '../../../modules/selectors';
 
 import { ApiUser } from '../../../api/types';
 
+import Button from '../../ui/Button';
+
 import {
   WEBSOCKET_URL,
   INIT,
@@ -437,13 +439,13 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         )}
       </div>
       {/* Action Buttons */}
-      <button
-        type="button"
-        className="Awareness Button default primary"
+      <Button
+        className="Awareness"
+        color="primary"
         onClick={awareness ? disableAwareness : enableAwareness}
       >
         {awareness ? 'Disable Awareness' : 'Enable Awareness'}
-      </button>
+      </Button>
     </div>
   );
 };
