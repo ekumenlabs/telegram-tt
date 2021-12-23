@@ -390,20 +390,20 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   }, [awareness, userId, messageId, chatId]);
 
   return (
-    <div className="MainImmedia">
+    <div className="immedia-presence">
       {/* Participants Header */}
       <div
-        className={`ImmediaHeader custom-scroll ${
-          awareness || 'ImmediaBackground'
+        className={`immedia-header custom-scroll ${
+          awareness || 'immedia-background'
         }`}
       >
         {awareness && (
-          <div className="Participants">
-            <div key={userId} className="VideoName VideoNameMe">
+          <div className="rows">
+            <div key={userId} className="participant participant-me">
               <video
                 ref={videoMeRef}
                 autoPlay
-                className="videoStream"
+                className="video-me"
                 width="640"
                 height="480"
               >
@@ -411,26 +411,26 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
               </video>
               <canvas
                 ref={canvasMeRef}
-                className="CanvasVideo"
+                className="photo-canvas"
                 width="70"
                 height="50"
               />
-              <text className="Nickname">{nickname}</text>
+              <text className="photo-caption">{nickname}</text>
             </div>
             {participants
               && participants.map(
                 ({ id, image, nickname: participantNickname }) => {
                   return image === undefined ? (
-                    <div key={id} className="VideoName" />
+                    <div key={id} className="participant" />
                   ) : (
-                    <div key={id} className="VideoName VideoNameParticipants">
+                    <div key={id} className="participant participant-not-me">
                       <canvas
-                        className="CanvasVideo"
+                        className="photo-canvas"
                         id={`canvas-${id}`}
                         width="70"
                         height="50"
                       />
-                      <text className="Nickname">{participantNickname}</text>
+                      <text className="photo-caption">{participantNickname}</text>
                     </div>
                   );
                 },
@@ -440,7 +440,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
       </div>
       {/* Action Buttons */}
       <Button
-        className="Awareness"
+        className="enable-disable-awareness"
         color="primary"
         onClick={awareness ? disableAwareness : enableAwareness}
       >

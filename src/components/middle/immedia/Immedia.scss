@@ -1,8 +1,8 @@
-.MainImmedia {
+.immedia-presence {
   width: 100%;
 }
 
-.ImmediaHeader {
+.immedia-header {
   min-height: 110px;
   max-height: 180px;
   background: transparent;
@@ -11,21 +11,21 @@
   width: 100%;
 }
 
-.ImmediaBackground {
+.immedia-background {
   display: none;
 }
 
-.Participants {
+.rows {
   clear: both;
   display: flex;
   flex-wrap: wrap;
 }
 
-.videoStream {
+.video-me {
   display: none;
 }
 
-.VideoName {
+.participant {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -34,26 +34,26 @@
   margin-bottom: 3px;
 }
 
-.VideoNameMe {
+.participant-me {
   border: 2px solid var(--color-chat-active);
 }
 
-.VideoNameParticipants {
+.participant-not-me {
   border: 2px solid gray;
 }
 
-.CanvasVideo {
+.photo-canvas {
   margin: 5px;
 }
 
-.Nickname {
+.photo-caption {
   font-size: 0.7em;
   font-weight: bold;
   width: 70px;
   text-align: center;
 }
 
-.Awareness {
+.enable-disable-awareness {
   --base-top-pos: 6rem;
   position: absolute;
   right: -9rem;
