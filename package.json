@@ -49,6 +49,7 @@
     "@types/react": "^17.0.19",
     "@types/react-dom": "^17.0.9",
     "@types/resize-observer-browser": "^0.1.6",
+    "@types/sockjs-client": "^1.5.1",
     "@types/wicg-mediasession": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^4.29.1",
     "@typescript-eslint/parser": "^4.29.1",
@@ -115,6 +116,7 @@
     "pako": "^2.0.4",
     "path-browserify": "^1.0.1",
     "qr-creator": "^1.0.0",
+    "sockjs-client": "^1.5.2",
     "websocket": "^1.0.34"
   }
 }

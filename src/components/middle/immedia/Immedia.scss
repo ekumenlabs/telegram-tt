@@ -1,0 +1,71 @@
+.immedia-presence {
+  position: relative;
+  width: 100%;
+}
+
+.immedia-header {
+  min-height: 110px;
+  max-height: 180px;
+  background: transparent;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.immedia-background {
+  display: none;
+}
+
+.rows {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.video-me {
+  display: none;
+  width: 640;
+  height: 480;
+}
+
+.participant {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-bottom: 3px;
+}
+
+.participant-me {
+  border: 2px solid var(--color-chat-active);
+}
+
+.participant-not-me {
+  border: 2px solid gray;
+}
+
+.photo-canvas {
+  width: 70px;
+  height: 50px;
+}
+
+.photo-caption {
+  font-size: 0.7em;
+  font-weight: bold;
+  width: inherit;
+  text-align: center;
+}
+
+
+.enable-disable-awareness {
+  position: absolute;
+  top: 0;
+  right: -9rem;
+  z-index: var(--z-scroll-down-button);
+  width: fit-content;
+  text-transform: none;
+  transition: all 0.5s;
+  &:hover {
+    transform: translateX(-140px);
+    transition: transform 0.5s ease-in;
+  }
+}
