@@ -16,7 +16,6 @@
 }
 
 .rows {
-  clear: both;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-evenly;
@@ -24,14 +23,14 @@
 
 .video-me {
   display: none;
+  width: 640;
+  height: 480;
 }
 
 .participant {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 2px;
-  margin-right: 3px;
+  align-items: stretch;
   margin-bottom: 3px;
 }
 
@@ -44,15 +43,18 @@
 }
 
 .photo-canvas {
-  margin: 5px;
+  width: 70px;
+  height: 50px;
+  border-radius: 6px;
 }
 
 .photo-caption {
   font-size: 0.7em;
   font-weight: bold;
-  width: 70px;
+  width: inherit;
   text-align: center;
 }
+
 
 .enable-disable-awareness {
   --base-top-pos: 6rem;

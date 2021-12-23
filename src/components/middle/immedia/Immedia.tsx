@@ -404,16 +404,12 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
                 ref={videoMeRef}
                 autoPlay
                 className="video-me"
-                width="640"
-                height="480"
               >
                 <track kind="captions" />
               </video>
               <canvas
                 ref={canvasMeRef}
                 className="photo-canvas"
-                width="70"
-                height="50"
               />
               <text className="photo-caption">{nickname}</text>
             </div>
@@ -427,8 +423,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
                       <canvas
                         className="photo-canvas"
                         id={`canvas-${id}`}
-                        width="70"
-                        height="50"
                       />
                       <text className="photo-caption">{participantNickname}</text>
                     </div>
