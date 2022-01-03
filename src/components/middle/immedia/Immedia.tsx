@@ -432,13 +432,15 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         )}
       </div>
       {/* Action Buttons */}
-      <Button
-        className="enable-disable-awareness"
-        color="primary"
-        onClick={awareness ? disableAwareness : enableAwareness}
-      >
-        {awareness ? 'Disable Awareness' : 'Enable Awareness'}
-      </Button>
+      { process.env.IMMEDIA_ROOM_ID !== undefined && process.env.IMMEDIA_ROOM_ID === chatId && (
+        <Button
+          className="enable-disable-awareness"
+          color="primary"
+          onClick={awareness ? disableAwareness : enableAwareness}
+        >
+          {awareness ? 'Disable Awareness' : 'Enable Awareness'}
+        </Button>
+      )}
     </div>
   );
 };
