@@ -127,11 +127,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     }
   };
 
-  useEffect(() => {
-    // If the user changed chats, we need to clean up the old chat.
-    cleanUp();
-  }, [chatId]);
-
   const createConnection = () => {
     wsRef.current = new SockJS(WEBSOCKET_URL);
     wsRef.current.onopen = () => console.log(INIT, 'ws opened');
