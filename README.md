@@ -24,6 +24,18 @@ Obtain API ID and API hash on [my.telegram.org](https://my.telegram.org) and pop
 npm run dev
 ```
 
+### Immedia
+
+The Immedia React component connects to the [homonymous](https://github.com/ekumenlabs/immedia)' presence aware system which displays the user and participants webcam screenshots every few seconds.
+
+Immedia can be enabled by clicking the `Enable Awareness` button as shown below.
+
+![immedia](./assets/immedia/component.gif)
+
+This component can be disabled as well by clicking the `Disable Awareness` button.
+
+![immedia-disabled](./assets/immedia/disable.png)
+
 ### Invoking API from console
 
 Start your dev server and locate GramJS worker in console context.
@@ -39,3 +51,4 @@ await invoke(new GramJs.help.GetAppConfig())
 
 ## Bug reports and Suggestions
 If you find an issue with this app, let Telegram know using the [Suggestions Platform](https://bugs.telegram.org/c/4002).
+
