@@ -46,6 +46,7 @@ type StateProps = {
 };
 
 const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
+  const [roomId, setRoomId] = useState<String | undefined>(undefined);
   // State that tracks when update is being run. Triggers another update after UPDATE_RATE seconds.
   const [lastSnapshot, setLastSnapshot] = useState<string | undefined>(
     undefined,
@@ -70,6 +71,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     setAwareness(false);
     setLastSnapshot(undefined);
     setUserId(undefined);
+    setRoomId(undefined);
     // TODO: Check how to clean up tracks when user changes chats
     // FIX: Sometimes it works (i.e., disable webcam light), sometimes it doesn't.
     if (videoMeRef.current) {
@@ -176,10 +178,12 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     if (wsRef.current) {
       const currentMessageId = messageId + 1;
       setMessageId(currentMessageId);
+      const currentRoomId = formatRoom(chatId);
+      setRoomId(currentRoomId);
       const message = {
         msgId: currentMessageId,
         type: 'sub',
-        room: formatRoom(chatId),
+        room: currentRoomId,
         data: { password: false },
       };
       wsRef.current.send(JSON.stringify(message));
@@ -195,7 +199,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
       const message = {
         msgId: currentMessageId,
         id: userId,
-        room: formatRoom(chatId),
+        room: roomId,
         type: 'uns',
       };
       wsRef.current.send(JSON.stringify(message));
@@ -328,7 +332,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
           msgId: currentMessageId,
           id: userId,
           type: 'app',
-          room: formatRoom(chatId),
+          room: roomId,
           data: {
             type: 'update',
             data: {
@@ -352,7 +356,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     }
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [awareness, userId, messageId, nickname, chatId]);
+  }, [awareness, userId, messageId, nickname, roomId]);
 
   // TODO: Define the Heartbeat function to keep track user connection.
   // Keep Track of connection status
@@ -365,7 +369,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         const message = {
           msgId: currentMessageId,
           type,
-          room: formatRoom(chatId),
+          room: roomId,
           data: undefined,
         };
         console.log(INIT, `${type.toUpperCase()}: `, message);
@@ -373,7 +377,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
       }
     };
 
-    if (chatId !== undefined && userId !== undefined) {
+    if (roomId !== undefined && userId !== undefined) {
       let pingInterval: NodeJS.Timeout;
       if (awareness) {
         console.log(INIT, 'RUNNING PING INTERVAL EVERY ', PING_RATE);
@@ -382,7 +386,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
       return () => clearInterval(pingInterval);
     }
     return undefined;
-  }, [awareness, userId, messageId, chatId]);
+  }, [awareness, userId, messageId, roomId]);
 
   return (
     <div className="immedia-presence">
