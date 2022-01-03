@@ -1,6 +1,6 @@
 const WEBSOCKET_URL = process.env.APP_ENV === 'production'
   ? 'https://immedia.herokuapp.com/ws'
-  : 'https://localhost:3000/ws';
+  : 'http://localhost:3000/ws';
 
 // String pre-attached to console.log messages
 const INIT = 'IMMEDIA: ';
