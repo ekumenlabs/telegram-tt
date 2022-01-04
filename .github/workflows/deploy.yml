@@ -30,3 +30,5 @@ jobs:
         run: npm ci
       - name: Deployment script
         run: npm run deploy:production
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
