@@ -20,5 +20,13 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-      - run: npm install # npm ci fails
-      - run: npm run deploy:production
+          persist-credentials: false
+
+      - name: Reconfigure git to use HTTP authentication
+        run: >
+          git config --global url."https://github.com/".insteadOf
+          ssh://git@github.com/
+      - name: Install dependencies
+        run: npm ci
+      - name: Deployment script
+        run: npm run deploy:production
