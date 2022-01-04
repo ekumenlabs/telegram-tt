@@ -36,6 +36,8 @@ This component can be disabled as well by clicking the `Disable Awareness` butto
 
 ![immedia-disabled](./assets/immedia/disable.png)
 
+> **Dev Note:** An env variable needs to be added to your `.env` file to enable Immedia with the `IMMEDIA_ROOM_ID` variable corresponding to the chat id of the group/chat you want to enable. For example: `IMMEDIA_ROOM_ID=-1188795392`.
+
 ### Invoking API from console
 
 Start your dev server and locate GramJS worker in console context.

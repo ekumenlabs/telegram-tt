@@ -118,6 +118,7 @@ module.exports = (env = {}, argv = {}) => {
         TELEGRAM_T_API_ID: '',
         TELEGRAM_T_API_HASH: '',
         TEST_SESSION: '',
+        IMMEDIA_ROOM_ID: '',
       }),
       new ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
