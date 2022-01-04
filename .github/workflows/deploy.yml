@@ -31,6 +31,8 @@ jobs:
       - name: Deployment script
         run: |
           git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
-          npm run deploy:production -- -u "github-actions-bot <support+actions@github.com>"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          npm run deploy:production
         env:
           GITHUB_TOKEN: ${{ github.token }}
