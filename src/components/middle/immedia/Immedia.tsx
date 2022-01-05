@@ -24,6 +24,8 @@ import {
   UPDATE_RATE,
 } from './constants';
 
+import useInterval from '../../../hooks/useInterval';
+
 import { formatRoom } from './helpers';
 
 import './Immedia.scss';
@@ -229,164 +231,135 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     if (awareness && participants.length) getParticipantsSnapshots();
   }, [participants, awareness]);
 
-  useEffect(() => {
-    const getSnapshotVideo = () => {
-      if (awareness) {
-        if (canvasMeRef.current) {
-          const context = canvasMeRef.current.getContext('2d');
+  const getSnapshotVideo = () => {
+    if (canvasMeRef.current) {
+      const context = canvasMeRef.current.getContext('2d');
 
-          const cbk = (stream: MediaStream) => {
-            if (videoMeRef.current && context) {
-              videoMeRef.current.srcObject = stream;
-              // Wait some time beacuse the video is not ready
-              // FIX: Maybe there's a better way to do this.
-              // TRY: https://developer.mozilla.org/en-US/docs/Web/API/ImageCapture/ImageCapture
-              setTimeout(() => {
-                const video = videoMeRef.current;
-                const canvas = canvasMeRef.current;
-                // eslint-disable-next-line  no-null/no-null
-                if (video === null || canvas === null) return;
-                // show snapshot
-                context.drawImage(
-                  video,
-                  160,
-                  120,
-                  360,
-                  240,
-                  0,
-                  0,
-                  canvas.width,
-                  canvas.height,
-                );
-                const image = canvas.toDataURL('image/png');
-                setLastSnapshot(image);
-              }, SNAPSHOT_RATE / 5);
-            }
-          };
-
-          if (navigator.mediaDevices.getUserMedia) {
-            // TODO: Rewrite using async/await
-            navigator.mediaDevices
-              .getUserMedia({ video: true, audio: false })
-              .then((stream) => cbk(stream))
-              .catch((err) => console.error(err));
-          } else {
-            console.error(new Error(`${INIT}There is no user media`));
-          }
+      const cbk = (stream: MediaStream) => {
+        if (videoMeRef.current && context) {
+          videoMeRef.current.srcObject = stream;
+          // Wait some time beacuse the video is not ready
+          // FIX: Maybe there's a better way to do this.
+          // TRY: https://developer.mozilla.org/en-US/docs/Web/API/ImageCapture/ImageCapture
+          setTimeout(() => {
+            const video = videoMeRef.current;
+            const canvas = canvasMeRef.current;
+            // eslint-disable-next-line  no-null/no-null
+            if (video === null || canvas === null) return;
+            // show snapshot
+            context.drawImage(
+              video,
+              160,
+              120,
+              360,
+              240,
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+            );
+            const image = canvas.toDataURL('image/png');
+            setLastSnapshot(image);
+          }, SNAPSHOT_RATE / 5);
         }
-      }
-    };
+      };
 
-    let result: NodeJS.Timeout;
-    if (awareness) {
-      // get webcam snapshots every SNAPSHOT_RATE seconds
-      result = setInterval(getSnapshotVideo, SNAPSHOT_RATE);
+      if (navigator.mediaDevices.getUserMedia) {
+        // TODO: Rewrite using async/await
+        navigator.mediaDevices
+          .getUserMedia({ video: true, audio: false })
+          .then((stream) => cbk(stream))
+          .catch((err) => console.error(err));
+      } else {
+        console.error(new Error(`${INIT}There is no user media`));
+      }
     }
-    return () => clearInterval(result);
-  }, [awareness]);
+  };
+
+  useInterval(() => {
+    getSnapshotVideo();
+  }, awareness ? SNAPSHOT_RATE : undefined);
 
   // GC that runs every GC_RATE seconds and checks if, for each participant,
   // their last snapshot was taken inside a REMOVE_THRESHOLD seconds time frame.
   // If not, it will remove the participant.
-  useEffect(() => {
-    const updateParticipants = () => {
-      console.log(INIT, 'Garbage collect participants');
-      participants.forEach((participant) => {
-        const removeThreshold = new Date().getTime() - REMOVE_THRESHOLD;
-        if (participant.timestamp && participant.timestamp < removeThreshold) {
-          console.log(INIT, 'Garbage collect participant', participant.id);
-          setParticipants(participants.filter((p) => p.id !== participant.id));
-        }
-      });
-      if (participants.length === 0) {
-        console.log(INIT, 'There is 1 participant left');
-      } else {
-        console.log(
-          INIT,
-          'There are',
-          1 + participants.length,
-          'participants left.',
-        );
+  const updateParticipants = () => {
+    console.log(INIT, 'Garbage collect participants');
+    participants.forEach((participant) => {
+      const removeThreshold = new Date().getTime() - REMOVE_THRESHOLD;
+      if (participant.timestamp && participant.timestamp < removeThreshold) {
+        console.log(INIT, 'Garbage collect participant', participant.id);
+        setParticipants(participants.filter((p) => p.id !== participant.id));
       }
-    };
-
-    if (participants.length) {
-      let participantsInterval: NodeJS.Timeout;
-      if (awareness) {
-        participantsInterval = setInterval(updateParticipants, GC_RATE);
-      }
-      return () => clearInterval(participantsInterval);
+    });
+    if (participants.length === 0) {
+      console.log(INIT, 'There is 1 participant left');
+    } else {
+      console.log(
+        INIT,
+        'There are',
+        1 + participants.length,
+        'participants left.',
+      );
     }
-    return undefined;
-  }, [awareness, participants]);
+  };
+
+  useInterval(() => {
+    updateParticipants();
+  }, awareness ? GC_RATE : undefined);
 
   // FIX: Make the function use the latest value of state.
   // I think the issue arises when the callback is sent the value used is the one when timeout was called.
   // async states?
-  useEffect(() => {
-    const sendUpdate = () => {
-      if (wsRef.current) {
-        const currentMessageId = messageId + 1;
-        setMessageId(currentMessageId);
-        const message = {
-          msgId: currentMessageId,
-          id: userId,
-          type: 'app',
-          room: roomId,
+  const sendUpdate = () => {
+    if (wsRef.current) {
+      const currentMessageId = messageId + 1;
+      setMessageId(currentMessageId);
+      const message = {
+        msgId: currentMessageId,
+        id: userId,
+        type: 'app',
+        room: roomId,
+        data: {
+          type: 'update',
           data: {
-            type: 'update',
-            data: {
-              image: lastSnapshot,
-              timestamp: new Date().getTime(),
-              nickname,
-              id: userId,
-            },
+            image: lastSnapshot,
+            timestamp: new Date().getTime(),
+            nickname,
+            id: userId,
           },
-        };
-        console.log(INIT, 'Updating with message: ', message);
-        wsRef.current.send(JSON.stringify(message));
-      }
-    };
-    if (lastSnapshot !== undefined && userId !== undefined) {
-      let updateInterval: NodeJS.Timeout;
-      if (awareness) {
-        updateInterval = setInterval(sendUpdate, UPDATE_RATE);
-      }
-      return () => clearInterval(updateInterval);
+        },
+      };
+      console.log(INIT, 'Updating with message: ', message);
+      wsRef.current.send(JSON.stringify(message));
     }
-    return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [awareness, userId, messageId, nickname, roomId]);
+  };
+
+  useInterval(() => {
+    sendUpdate();
+  }, awareness ? UPDATE_RATE : undefined);
 
   // TODO: Define the Heartbeat function to keep track user connection.
   // Keep Track of connection status
-  useEffect(() => {
-    const ping = () => {
-      const type = 'ping';
-      if (wsRef.current) {
-        const currentMessageId = messageId + 1;
-        setMessageId(currentMessageId);
-        const message = {
-          msgId: currentMessageId,
-          type,
-          room: roomId,
-          data: undefined,
-        };
-        console.log(INIT, `${type.toUpperCase()}: `, message);
-        wsRef.current.send(JSON.stringify(message));
-      }
-    };
-
-    if (roomId !== undefined && userId !== undefined) {
-      let pingInterval: NodeJS.Timeout;
-      if (awareness) {
-        console.log(INIT, 'RUNNING PING INTERVAL EVERY ', PING_RATE);
-        pingInterval = setInterval(ping, PING_RATE);
-      }
-      return () => clearInterval(pingInterval);
+  const ping = () => {
+    const type = 'ping';
+    if (wsRef.current) {
+      const currentMessageId = messageId + 1;
+      setMessageId(currentMessageId);
+      const message = {
+        msgId: currentMessageId,
+        type,
+        room: roomId,
+        data: undefined,
+      };
+      console.log(INIT, `${type.toUpperCase()}: `, message);
+      wsRef.current.send(JSON.stringify(message));
     }
-    return undefined;
-  }, [awareness, userId, messageId, roomId]);
+  };
+
+  useInterval(() => {
+    ping();
+  }, awareness ? PING_RATE : undefined);
 
   return (
     <div className="immedia-presence">
