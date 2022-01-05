@@ -30,8 +30,6 @@ import { formatRoom } from './helpers';
 
 import './Immedia.scss';
 
-// Let prehook commit with console.logs
-/* eslint-disable no-console */
 type ParticipantsType = {
   id: string;
   nickname?: string;
@@ -68,6 +66,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 
   const cleanUp = () => {
+    // eslint-disable-next-line no-console
     console.log(INIT, 'Cleaning up!');
     setParticipants([]);
     setAwareness(false);
@@ -82,12 +81,13 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         tracks.forEach((track) => track.stop());
       }
     }
-    // TODO: We need to also clean up set intervals.
   };
 
   const joinedParticipant = (participant: ParticipantsType) => {
+    // eslint-disable-next-line no-console
     console.log(INIT, 'USER JOINED!');
     setParticipants([...participants, participant]);
+    // eslint-disable-next-line no-console
     console.log(
       INIT,
       'THERE ARE ',
@@ -97,6 +97,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   };
 
   const updatedParticipant = (participant: ParticipantsType) => {
+    // eslint-disable-next-line no-console
     console.log(INIT, 'USER UPDATED!');
     setParticipants(
       participants.map((p) => (p.id === participant.id ? participant : p)),
@@ -104,6 +105,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   };
 
   const leftParticipant = (participant: ParticipantsType) => {
+    // eslint-disable-next-line no-console
     console.log(INIT, 'USER LEFT with ID: ', participant);
     setParticipants(participants.filter((p) => p.id !== participant.id));
   };
@@ -127,20 +129,27 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         messageData.forEach((id: string) => leftParticipant({ id }));
         break;
       default:
+        // eslint-disable-next-line no-console
         console.log(INIT, 'UNKNOWN MESSAGE TYPE!');
     }
   };
 
   const createConnection = () => {
     wsRef.current = new SockJS(WEBSOCKET_URL);
-    wsRef.current.onopen = () => console.log(INIT, 'ws opened');
+    wsRef.current.onopen = () => {
+      // eslint-disable-next-line no-console
+      console.log(INIT, 'ws opened');
+    };
     wsRef.current.onclose = () => {
+      // eslint-disable-next-line no-console
       console.log(INIT, 'ws closed');
       // reconnect
       setTimeout(createConnection, 1000);
     };
     wsRef.current.onerror = (event) => {
+      // eslint-disable-next-line no-console
       console.log(INIT, 'ws error');
+      // eslint-disable-next-line no-console
       console.log(INIT, event);
       // clean up
       wsRef.current = undefined;
@@ -158,9 +167,12 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
       wsRef.current.onmessage = (event) => {
         const response = JSON.parse(event.data);
         const { data } = response;
+        // eslint-disable-next-line no-console
         console.log(INIT, 'RECEIVED MESSAGE!');
+        // eslint-disable-next-line no-console
         console.log(INIT, response);
         if (data.id && data.success === true) {
+          // eslint-disable-next-line no-console
           console.log(INIT, 'SET USER ID: ', data.id);
           setUserId(data.id);
         }
@@ -170,12 +182,12 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   }, [handleMessage]);
 
   useEffect(() => {
+    // eslint-disable-next-line no-console
     console.log(INIT, 'Setting nickname');
     // Add whitespace until data is loaded
     setNickname(currentUser?.username || '\u00a0\u00a0');
   }, [currentUser]);
 
-  // TODO: Correct true value of messageId. Using callbacks overwrites the value.
   const enableAwareness = () => {
     if (wsRef.current) {
       const currentMessageId = messageId + 1;
@@ -189,6 +201,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         data: { password: false },
       };
       wsRef.current.send(JSON.stringify(message));
+      // eslint-disable-next-line no-console
       console.log(INIT, 'Enabled Awareness');
       setAwareness(true);
     }
@@ -205,6 +218,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         type: 'uns',
       };
       wsRef.current.send(JSON.stringify(message));
+      // eslint-disable-next-line no-console
       console.log(INIT, 'Disabled Awareness');
       cleanUp();
     }
@@ -214,6 +228,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     const getParticipantsSnapshots = () => {
       // update each participant's snapshot
       participants.forEach((participant) => {
+        // eslint-disable-next-line no-console
         console.log(INIT, 'Getting snapshot for', participant);
         const canvas = document.getElementById(
           `canvas-${participant.id}`,
@@ -269,8 +284,12 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         navigator.mediaDevices
           .getUserMedia({ video: true, audio: false })
           .then((stream) => cbk(stream))
-          .catch((err) => console.error(err));
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error(err);
+          });
       } else {
+        // eslint-disable-next-line no-console
         console.error(new Error(`${INIT}There is no user media`));
       }
     }
@@ -284,17 +303,21 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   // their last snapshot was taken inside a REMOVE_THRESHOLD seconds time frame.
   // If not, it will remove the participant.
   const updateParticipants = () => {
+    // eslint-disable-next-line no-console
     console.log(INIT, 'Garbage collect participants');
     participants.forEach((participant) => {
       const removeThreshold = new Date().getTime() - REMOVE_THRESHOLD;
       if (participant.timestamp && participant.timestamp < removeThreshold) {
+        // eslint-disable-next-line no-console
         console.log(INIT, 'Garbage collect participant', participant.id);
         setParticipants(participants.filter((p) => p.id !== participant.id));
       }
     });
     if (participants.length === 0) {
+      // eslint-disable-next-line no-console
       console.log(INIT, 'There is 1 participant left');
     } else {
+      // eslint-disable-next-line no-console
       console.log(
         INIT,
         'There are',
@@ -308,9 +331,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     updateParticipants();
   }, awareness ? GC_RATE : undefined);
 
-  // FIX: Make the function use the latest value of state.
-  // I think the issue arises when the callback is sent the value used is the one when timeout was called.
-  // async states?
   const sendUpdate = () => {
     if (wsRef.current) {
       const currentMessageId = messageId + 1;
@@ -330,6 +350,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
           },
         },
       };
+      // eslint-disable-next-line no-console
       console.log(INIT, 'Updating with message: ', message);
       wsRef.current.send(JSON.stringify(message));
     }
@@ -352,6 +373,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         room: roomId,
         data: undefined,
       };
+      // eslint-disable-next-line no-console
       console.log(INIT, `${type.toUpperCase()}: `, message);
       wsRef.current.send(JSON.stringify(message));
     }
@@ -417,7 +439,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     </div>
   );
 };
-/* eslint-enable no-console */
+
 export default memo(
   withGlobal<OwnProps>((global): StateProps => {
     const { currentUserId } = global;
