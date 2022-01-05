@@ -36,3 +36,6 @@ jobs:
           npm run deploy:production
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          TELEGRAM_T_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_T_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          IMMEDIA_ROOM_ID: ${{ secrets.IMMEDIA_ROOM_ID }}
