@@ -58,8 +58,9 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const [nickname, setNickname] = useState('');
   const [awareness, setAwareness] = useState(false);
   const [participants, setParticipants] = useState<ParticipantsType[]>([]);
+  const [reconnection, setReconnection] = useState(false);
+  const [connected, setConnected] = useState(false);
 
-  const wsReconnectingRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const wsRef = useRef<WebSocket | undefined>(undefined);
   // eslint-disable-next-line  no-null/no-null
   const canvasMeRef = useRef<HTMLCanvasElement | null>(null);
@@ -68,31 +69,51 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 
-  const createConnection = () => {
-    wsReconnectingRef.current = undefined;
-    clearTimeout(wsReconnectingRef.current);
+  const unsubscribeUserId = useCallback(() => {
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const message = {
+      msgId: currentMessageId,
+      id: userId,
+      room: roomId,
+      type: 'uns',
+    };
+    wsRef.current?.send(JSON.stringify(message));
+  }, [userId, roomId, messageId]);
 
+  const subscribeUserId = useCallback(() => {
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const currentRoomId = formatRoom(chatId);
+    setRoomId(currentRoomId);
+    const message = {
+      msgId: currentMessageId,
+      type: 'sub',
+      room: currentRoomId,
+      data: { password: false },
+    };
+    wsRef.current?.send(JSON.stringify(message));
+  }, [messageId, chatId]);
+
+  const createConnection = () => {
     wsRef.current = new SockJS(WEBSOCKET_URL);
 
     wsRef.current.onopen = () => {
       // eslint-disable-next-line no-console
       console.log(INIT, 'ws opened');
-      // TODO: There's an issue here when calling createConectionCallback from the setTimeout.
-      // It doesnt update the awareness state.
+      setConnected(true);
       // if awareness was activated (reconnection), then subscribe to the room again
-      // if (awareness) enableAwareness();
+      if (awareness) subscribeUserId();
     };
     wsRef.current.onclose = () => {
       wsRef.current = undefined;
+      setConnected(false);
+      unsubscribeUserId();
+      setUserId(undefined);
       // eslint-disable-next-line no-console
       console.log(INIT, 'ws closed');
       // reconnect
-      wsReconnectingRef.current = setTimeout(() => {
-        // eslint-disable-next-line no-console
-        console.log(INIT, 'Reconnecting WS...');
-        // eslint-disable-next-line @typescript-eslint/no-use-before-define
-        createConnectionCallback();
-      }, WEBSOCKET_RECONNECTION_RATE);
+      setReconnection(true);
     };
     wsRef.current.onerror = (event) => {
       // eslint-disable-next-line no-console
@@ -102,9 +123,19 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
       wsRef.current?.close();
     };
   };
-  // eslint-disable-next-line @typescript-eslint/no-use-before-define
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const createConnectionCallback = useCallback(createConnection, [awareness]);
+
+  useEffect(() => {
+    if (reconnection) {
+      setTimeout(() => {
+        // eslint-disable-next-line no-console
+        console.log(INIT, 'Reconnecting WS...');
+        createConnectionCallback();
+      }, WEBSOCKET_RECONNECTION_RATE);
+      setReconnection(false);
+    }
+  }, [reconnection, createConnectionCallback]);
 
   useEffect(() => {
     if (!wsRef.current) createConnectionCallback();
@@ -142,6 +173,11 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     setParticipants(participants.filter((p) => p.id !== participant.id));
   };
 
+  // Sends a re-subscription when there are reconnections.
+  useInterval(() => {
+    subscribeUserId();
+  }, awareness && connected && userId === undefined ? WEBSOCKET_RECONNECTION_RATE : undefined);
+
   const handleMessage = useCallback((data: any) => {
     const messageData = data.data;
     switch (data.type) {
@@ -167,7 +203,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   }, [participants]);
 
   useEffect(() => {
-    if (wsRef.current) {
+    if (connected && wsRef.current) {
       wsRef.current.onmessage = (event) => {
         const response = JSON.parse(event.data);
         const { data } = response;
@@ -183,7 +219,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         handleMessage(response);
       };
     }
-  }, [handleMessage]);
+  }, [handleMessage, connected]);
 
   useEffect(() => {
     // Add whitespace until data is loaded
@@ -192,37 +228,17 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   const enableAwareness = () => {
     if (wsRef.current) {
-      const currentMessageId = messageId + 1;
-      setMessageId(currentMessageId);
-      const currentRoomId = formatRoom(chatId);
-      setRoomId(currentRoomId);
-      const message = {
-        msgId: currentMessageId,
-        type: 'sub',
-        room: currentRoomId,
-        data: { password: false },
-      };
-      wsRef.current.send(JSON.stringify(message));
       // eslint-disable-next-line no-console
       console.log(INIT, 'Enabled Awareness');
+      subscribeUserId();
       setAwareness(true);
     }
   };
 
   const disableAwareness = () => {
-    if (wsRef.current && userId !== undefined) {
-      const currentMessageId = messageId + 1;
-      setMessageId(currentMessageId);
-      const message = {
-        msgId: currentMessageId,
-        id: userId,
-        room: roomId,
-        type: 'uns',
-      };
-      wsRef.current.send(JSON.stringify(message));
-    }
     // eslint-disable-next-line no-console
     console.log(INIT, 'Disabled Awareness');
+    if (wsRef.current && userId !== undefined) unsubscribeUserId();
     cleanUp();
   };
 
@@ -299,7 +315,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   useInterval(() => {
     getSnapshotVideo();
-  }, awareness && wsRef.current !== undefined ? SNAPSHOT_RATE : undefined);
+  }, awareness ? SNAPSHOT_RATE : undefined);
 
   // GC that runs every GC_RATE seconds and checks if, for each participant,
   // their last snapshot was taken inside a REMOVE_THRESHOLD seconds time frame.
@@ -317,7 +333,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     updateParticipants();
   }, awareness && wsRef.current !== undefined ? GC_RATE : undefined);
 
-  const sendUpdate = () => {
+  const sendUpdate = useCallback(() => {
     const currentMessageId = messageId + 1;
     setMessageId(currentMessageId);
     const message = {
@@ -335,14 +351,14 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         },
       },
     };
-      // eslint-disable-next-line no-console
+    // eslint-disable-next-line no-console
     console.log(INIT, 'Updating with message: ', message);
     wsRef.current?.send(JSON.stringify(message));
-  };
+  }, [userId, messageId, roomId, lastSnapshot, nickname]);
 
   useInterval(() => {
     sendUpdate();
-  }, awareness && wsRef.current !== undefined && userId !== undefined ? UPDATE_RATE : undefined);
+  }, awareness && connected && userId ? UPDATE_RATE : undefined);
 
   // TODO: Define the Heartbeat function to keep track user connection.
   // Keep Track of connection status
@@ -365,7 +381,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   useInterval(() => {
     ping();
-  }, awareness && wsRef.current !== undefined && userId !== undefined ? PING_RATE : undefined);
+  }, awareness && connected && userId ? PING_RATE : undefined);
 
   return (
     <div className="immedia-presence">
