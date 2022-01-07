@@ -2,6 +2,7 @@ import SockJS from 'sockjs-client';
 import React, {
   FC,
   useEffect,
+  useCallback,
   useState,
   useRef,
   memo,
@@ -22,6 +23,7 @@ import {
   SNAPSHOT_RATE,
   PING_RATE,
   UPDATE_RATE,
+  WEBSOCKET_RECONNECTION_RATE,
 } from './constants';
 
 import useInterval from '../../../hooks/useInterval';
@@ -56,6 +58,8 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const [nickname, setNickname] = useState('');
   const [awareness, setAwareness] = useState(false);
   const [participants, setParticipants] = useState<ParticipantsType[]>([]);
+  const [reconnection, setReconnection] = useState(false);
+  const [connected, setConnected] = useState(false);
 
   const wsRef = useRef<WebSocket | undefined>(undefined);
   // eslint-disable-next-line  no-null/no-null
@@ -64,6 +68,78 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const videoMeRef = useRef<HTMLVideoElement | null>(null);
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
+
+  const unsubscribeUserId = useCallback(() => {
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const message = {
+      msgId: currentMessageId,
+      id: userId,
+      room: roomId,
+      type: 'uns',
+    };
+    wsRef.current?.send(JSON.stringify(message));
+  }, [userId, roomId, messageId]);
+
+  const subscribeUserId = useCallback(() => {
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const currentRoomId = formatRoom(chatId);
+    setRoomId(currentRoomId);
+    const message = {
+      msgId: currentMessageId,
+      type: 'sub',
+      room: currentRoomId,
+      data: { password: false },
+    };
+    wsRef.current?.send(JSON.stringify(message));
+  }, [messageId, chatId]);
+
+  const createConnection = () => {
+    wsRef.current = new SockJS(WEBSOCKET_URL);
+
+    wsRef.current.onopen = () => {
+      // eslint-disable-next-line no-console
+      console.log(INIT, 'ws opened');
+      setConnected(true);
+      // if awareness was activated (reconnection), then subscribe to the room again
+      if (awareness) subscribeUserId();
+    };
+    wsRef.current.onclose = () => {
+      wsRef.current = undefined;
+      setConnected(false);
+      unsubscribeUserId();
+      setUserId(undefined);
+      // eslint-disable-next-line no-console
+      console.log(INIT, 'ws closed');
+      // reconnect
+      setReconnection(true);
+    };
+    wsRef.current.onerror = (event) => {
+      // eslint-disable-next-line no-console
+      console.log(INIT, 'ws error');
+      // eslint-disable-next-line no-console
+      console.log(INIT, event);
+      wsRef.current?.close();
+    };
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const createConnectionCallback = useCallback(createConnection, [awareness]);
+
+  useEffect(() => {
+    if (reconnection) {
+      setTimeout(() => {
+        // eslint-disable-next-line no-console
+        console.log(INIT, 'Reconnecting WS...');
+        createConnectionCallback();
+      }, WEBSOCKET_RECONNECTION_RATE);
+      setReconnection(false);
+    }
+  }, [reconnection, createConnectionCallback]);
+
+  useEffect(() => {
+    if (!wsRef.current) createConnectionCallback();
+  }, [createConnectionCallback]);
 
   const cleanUp = () => {
     // eslint-disable-next-line no-console
@@ -84,34 +160,25 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   };
 
   const joinedParticipant = (participant: ParticipantsType) => {
-    // eslint-disable-next-line no-console
-    console.log(INIT, 'USER JOINED!');
     setParticipants([...participants, participant]);
-    // eslint-disable-next-line no-console
-    console.log(
-      INIT,
-      'THERE ARE ',
-      1 + participants.length,
-      'PARTICIPANTS IN THE ROOM',
-    );
   };
 
   const updatedParticipant = (participant: ParticipantsType) => {
-    // eslint-disable-next-line no-console
-    console.log(INIT, 'USER UPDATED!');
     setParticipants(
       participants.map((p) => (p.id === participant.id ? participant : p)),
     );
   };
 
   const leftParticipant = (participant: ParticipantsType) => {
-    // eslint-disable-next-line no-console
-    console.log(INIT, 'USER LEFT with ID: ', participant);
     setParticipants(participants.filter((p) => p.id !== participant.id));
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleMessage = (data: any) => {
+  // Sends a re-subscription when there are reconnections.
+  useInterval(() => {
+    subscribeUserId();
+  }, awareness && connected && userId === undefined ? WEBSOCKET_RECONNECTION_RATE : undefined);
+
+  const handleMessage = useCallback((data: any) => {
     const messageData = data.data;
     switch (data.type) {
       case 'join':
@@ -128,42 +195,15 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         // {type: 'left', data: ['idxxx', 'idyyy', ...]}
         messageData.forEach((id: string) => leftParticipant({ id }));
         break;
-      default:
-        // eslint-disable-next-line no-console
-        console.log(INIT, 'UNKNOWN MESSAGE TYPE!');
+      // default:
+      //   // eslint-disable-next-line no-console
+      //   console.log(INIT, 'UNKNOWN MESSAGE TYPE!');
     }
-  };
-
-  const createConnection = () => {
-    wsRef.current = new SockJS(WEBSOCKET_URL);
-    wsRef.current.onopen = () => {
-      // eslint-disable-next-line no-console
-      console.log(INIT, 'ws opened');
-    };
-    wsRef.current.onclose = () => {
-      // eslint-disable-next-line no-console
-      console.log(INIT, 'ws closed');
-      // reconnect
-      setTimeout(createConnection, 1000);
-    };
-    wsRef.current.onerror = (event) => {
-      // eslint-disable-next-line no-console
-      console.log(INIT, 'ws error');
-      // eslint-disable-next-line no-console
-      console.log(INIT, event);
-      // clean up
-      wsRef.current = undefined;
-      cleanUp();
-    };
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participants]);
 
   useEffect(() => {
-    createConnection();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (wsRef.current) {
+    if (connected && wsRef.current) {
       wsRef.current.onmessage = (event) => {
         const response = JSON.parse(event.data);
         const { data } = response;
@@ -179,49 +219,27 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         handleMessage(response);
       };
     }
-  }, [handleMessage]);
+  }, [handleMessage, connected]);
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log(INIT, 'Setting nickname');
     // Add whitespace until data is loaded
     setNickname(currentUser?.username || '\u00a0\u00a0');
   }, [currentUser]);
 
   const enableAwareness = () => {
     if (wsRef.current) {
-      const currentMessageId = messageId + 1;
-      setMessageId(currentMessageId);
-      const currentRoomId = formatRoom(chatId);
-      setRoomId(currentRoomId);
-      const message = {
-        msgId: currentMessageId,
-        type: 'sub',
-        room: currentRoomId,
-        data: { password: false },
-      };
-      wsRef.current.send(JSON.stringify(message));
       // eslint-disable-next-line no-console
       console.log(INIT, 'Enabled Awareness');
+      subscribeUserId();
       setAwareness(true);
     }
   };
 
   const disableAwareness = () => {
-    if (wsRef.current) {
-      const currentMessageId = messageId + 1;
-      setMessageId(currentMessageId);
-      const message = {
-        msgId: currentMessageId,
-        id: userId,
-        room: roomId,
-        type: 'uns',
-      };
-      wsRef.current.send(JSON.stringify(message));
-      // eslint-disable-next-line no-console
-      console.log(INIT, 'Disabled Awareness');
-      cleanUp();
-    }
+    // eslint-disable-next-line no-console
+    console.log(INIT, 'Disabled Awareness');
+    if (wsRef.current && userId !== undefined) unsubscribeUserId();
+    cleanUp();
   };
 
   useEffect(() => {
@@ -303,62 +321,44 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   // their last snapshot was taken inside a REMOVE_THRESHOLD seconds time frame.
   // If not, it will remove the participant.
   const updateParticipants = () => {
-    // eslint-disable-next-line no-console
-    console.log(INIT, 'Garbage collect participants');
     participants.forEach((participant) => {
       const removeThreshold = new Date().getTime() - REMOVE_THRESHOLD;
       if (participant.timestamp && participant.timestamp < removeThreshold) {
-        // eslint-disable-next-line no-console
-        console.log(INIT, 'Garbage collect participant', participant.id);
         setParticipants(participants.filter((p) => p.id !== participant.id));
       }
     });
-    if (participants.length === 0) {
-      // eslint-disable-next-line no-console
-      console.log(INIT, 'There is 1 participant left');
-    } else {
-      // eslint-disable-next-line no-console
-      console.log(
-        INIT,
-        'There are',
-        1 + participants.length,
-        'participants left.',
-      );
-    }
   };
 
   useInterval(() => {
     updateParticipants();
-  }, awareness ? GC_RATE : undefined);
+  }, awareness && wsRef.current !== undefined ? GC_RATE : undefined);
 
-  const sendUpdate = () => {
-    if (wsRef.current) {
-      const currentMessageId = messageId + 1;
-      setMessageId(currentMessageId);
-      const message = {
-        msgId: currentMessageId,
-        id: userId,
-        type: 'app',
-        room: roomId,
+  const sendUpdate = useCallback(() => {
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const message = {
+      msgId: currentMessageId,
+      id: userId,
+      type: 'app',
+      room: roomId,
+      data: {
+        type: 'update',
         data: {
-          type: 'update',
-          data: {
-            image: lastSnapshot,
-            timestamp: new Date().getTime(),
-            nickname,
-            id: userId,
-          },
+          image: lastSnapshot,
+          timestamp: new Date().getTime(),
+          nickname,
+          id: userId,
         },
-      };
-      // eslint-disable-next-line no-console
-      console.log(INIT, 'Updating with message: ', message);
-      wsRef.current.send(JSON.stringify(message));
-    }
-  };
+      },
+    };
+    // eslint-disable-next-line no-console
+    console.log(INIT, 'Updating with message: ', message);
+    wsRef.current?.send(JSON.stringify(message));
+  }, [userId, messageId, roomId, lastSnapshot, nickname]);
 
   useInterval(() => {
     sendUpdate();
-  }, awareness ? UPDATE_RATE : undefined);
+  }, awareness && connected && userId ? UPDATE_RATE : undefined);
 
   // TODO: Define the Heartbeat function to keep track user connection.
   // Keep Track of connection status
@@ -381,7 +381,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   useInterval(() => {
     ping();
-  }, awareness ? PING_RATE : undefined);
+  }, awareness && connected && userId ? PING_RATE : undefined);
 
   return (
     <div className="immedia-presence">
