@@ -2,6 +2,7 @@ import SockJS from 'sockjs-client';
 import React, {
   FC,
   useEffect,
+  useCallback,
   useState,
   useRef,
   memo,
@@ -22,14 +23,15 @@ import {
   SNAPSHOT_RATE,
   PING_RATE,
   UPDATE_RATE,
+  WEBSOCKET_RECONNECTION_RATE,
 } from './constants';
+
+import useInterval from '../../../hooks/useInterval';
 
 import { formatRoom } from './helpers';
 
 import './Immedia.scss';
 
-// Let prehook commit with console.logs
-/* eslint-disable no-console */
 type ParticipantsType = {
   id: string;
   nickname?: string;
@@ -56,6 +58,8 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const [nickname, setNickname] = useState('');
   const [awareness, setAwareness] = useState(false);
   const [participants, setParticipants] = useState<ParticipantsType[]>([]);
+  const [reconnection, setReconnection] = useState(false);
+  const [connected, setConnected] = useState(false);
 
   const wsRef = useRef<WebSocket | undefined>(undefined);
   // eslint-disable-next-line  no-null/no-null
@@ -65,7 +69,80 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 
+  const unsubscribeUserId = useCallback(() => {
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const message = {
+      msgId: currentMessageId,
+      id: userId,
+      room: roomId,
+      type: 'uns',
+    };
+    wsRef.current?.send(JSON.stringify(message));
+  }, [userId, roomId, messageId]);
+
+  const subscribeUserId = useCallback(() => {
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const currentRoomId = formatRoom(chatId);
+    setRoomId(currentRoomId);
+    const message = {
+      msgId: currentMessageId,
+      type: 'sub',
+      room: currentRoomId,
+      data: { password: false },
+    };
+    wsRef.current?.send(JSON.stringify(message));
+  }, [messageId, chatId]);
+
+  const createConnection = () => {
+    wsRef.current = new SockJS(WEBSOCKET_URL);
+
+    wsRef.current.onopen = () => {
+      // eslint-disable-next-line no-console
+      console.log(INIT, 'ws opened');
+      setConnected(true);
+      // if awareness was activated (reconnection), then subscribe to the room again
+      if (awareness) subscribeUserId();
+    };
+    wsRef.current.onclose = () => {
+      wsRef.current = undefined;
+      setConnected(false);
+      unsubscribeUserId();
+      setUserId(undefined);
+      // eslint-disable-next-line no-console
+      console.log(INIT, 'ws closed');
+      // reconnect
+      setReconnection(true);
+    };
+    wsRef.current.onerror = (event) => {
+      // eslint-disable-next-line no-console
+      console.log(INIT, 'ws error');
+      // eslint-disable-next-line no-console
+      console.log(INIT, event);
+      wsRef.current?.close();
+    };
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const createConnectionCallback = useCallback(createConnection, [awareness]);
+
+  useEffect(() => {
+    if (reconnection) {
+      setTimeout(() => {
+        // eslint-disable-next-line no-console
+        console.log(INIT, 'Reconnecting WS...');
+        createConnectionCallback();
+      }, WEBSOCKET_RECONNECTION_RATE);
+      setReconnection(false);
+    }
+  }, [reconnection, createConnectionCallback]);
+
+  useEffect(() => {
+    if (!wsRef.current) createConnectionCallback();
+  }, [createConnectionCallback]);
+
   const cleanUp = () => {
+    // eslint-disable-next-line no-console
     console.log(INIT, 'Cleaning up!');
     setParticipants([]);
     setAwareness(false);
@@ -80,34 +157,34 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         tracks.forEach((track) => track.stop());
       }
     }
-    // TODO: We need to also clean up set intervals.
   };
 
+  useEffect(() => {
+    // log the number of participants in the room
+    // eslint-disable-next-line no-console
+    if (participants.length) console.log(INIT, `There are ${1 + participants.length} participants in the room`);
+  }, [participants]);
+
   const joinedParticipant = (participant: ParticipantsType) => {
-    console.log(INIT, 'USER JOINED!');
     setParticipants([...participants, participant]);
-    console.log(
-      INIT,
-      'THERE ARE ',
-      1 + participants.length,
-      'PARTICIPANTS IN THE ROOM',
-    );
   };
 
   const updatedParticipant = (participant: ParticipantsType) => {
-    console.log(INIT, 'USER UPDATED!');
     setParticipants(
       participants.map((p) => (p.id === participant.id ? participant : p)),
     );
   };
 
   const leftParticipant = (participant: ParticipantsType) => {
-    console.log(INIT, 'USER LEFT with ID: ', participant);
     setParticipants(participants.filter((p) => p.id !== participant.id));
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleMessage = (data: any) => {
+  // Sends a re-subscription when there are reconnections.
+  useInterval(() => {
+    subscribeUserId();
+  }, awareness && connected && userId === undefined ? WEBSOCKET_RECONNECTION_RATE : undefined);
+
+  const handleMessage = useCallback((data: any) => {
     const messageData = data.data;
     switch (data.type) {
       case 'join':
@@ -124,94 +201,55 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         // {type: 'left', data: ['idxxx', 'idyyy', ...]}
         messageData.forEach((id: string) => leftParticipant({ id }));
         break;
-      default:
-        console.log(INIT, 'UNKNOWN MESSAGE TYPE!');
     }
-  };
-
-  const createConnection = () => {
-    wsRef.current = new SockJS(WEBSOCKET_URL);
-    wsRef.current.onopen = () => console.log(INIT, 'ws opened');
-    wsRef.current.onclose = () => {
-      console.log(INIT, 'ws closed');
-      // reconnect
-      setTimeout(createConnection, 1000);
-    };
-    wsRef.current.onerror = (event) => {
-      console.log(INIT, 'ws error');
-      console.log(INIT, event);
-      // clean up
-      wsRef.current = undefined;
-      cleanUp();
-    };
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participants]);
 
   useEffect(() => {
-    createConnection();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (wsRef.current) {
+    if (connected && wsRef.current) {
       wsRef.current.onmessage = (event) => {
         const response = JSON.parse(event.data);
         const { data } = response;
+        // eslint-disable-next-line no-console
         console.log(INIT, 'RECEIVED MESSAGE!');
+        // eslint-disable-next-line no-console
         console.log(INIT, response);
         if (data.id && data.success === true) {
+          // eslint-disable-next-line no-console
           console.log(INIT, 'SET USER ID: ', data.id);
           setUserId(data.id);
         }
         handleMessage(response);
       };
     }
-  }, [handleMessage]);
+  }, [handleMessage, connected]);
 
   useEffect(() => {
-    console.log(INIT, 'Setting nickname');
     // Add whitespace until data is loaded
     setNickname(currentUser?.username || '\u00a0\u00a0');
   }, [currentUser]);
 
-  // TODO: Correct true value of messageId. Using callbacks overwrites the value.
   const enableAwareness = () => {
     if (wsRef.current) {
-      const currentMessageId = messageId + 1;
-      setMessageId(currentMessageId);
-      const currentRoomId = formatRoom(chatId);
-      setRoomId(currentRoomId);
-      const message = {
-        msgId: currentMessageId,
-        type: 'sub',
-        room: currentRoomId,
-        data: { password: false },
-      };
-      wsRef.current.send(JSON.stringify(message));
+      // eslint-disable-next-line no-console
       console.log(INIT, 'Enabled Awareness');
+      subscribeUserId();
       setAwareness(true);
     }
   };
 
   const disableAwareness = () => {
-    if (wsRef.current) {
-      const currentMessageId = messageId + 1;
-      setMessageId(currentMessageId);
-      const message = {
-        msgId: currentMessageId,
-        id: userId,
-        room: roomId,
-        type: 'uns',
-      };
-      wsRef.current.send(JSON.stringify(message));
-      console.log(INIT, 'Disabled Awareness');
-      cleanUp();
-    }
+    // eslint-disable-next-line no-console
+    console.log(INIT, 'Disabled Awareness');
+    if (wsRef.current && userId !== undefined) unsubscribeUserId();
+    cleanUp();
   };
 
   useEffect(() => {
     const getParticipantsSnapshots = () => {
       // update each participant's snapshot
       participants.forEach((participant) => {
+        // eslint-disable-next-line no-console
         console.log(INIT, 'Getting snapshot for', participant);
         const canvas = document.getElementById(
           `canvas-${participant.id}`,
@@ -229,164 +267,122 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     if (awareness && participants.length) getParticipantsSnapshots();
   }, [participants, awareness]);
 
-  useEffect(() => {
-    const getSnapshotVideo = () => {
-      if (awareness) {
-        if (canvasMeRef.current) {
-          const context = canvasMeRef.current.getContext('2d');
+  const getSnapshotVideo = () => {
+    if (canvasMeRef.current) {
+      const context = canvasMeRef.current.getContext('2d');
 
-          const cbk = (stream: MediaStream) => {
-            if (videoMeRef.current && context) {
-              videoMeRef.current.srcObject = stream;
-              // Wait some time beacuse the video is not ready
-              // FIX: Maybe there's a better way to do this.
-              // TRY: https://developer.mozilla.org/en-US/docs/Web/API/ImageCapture/ImageCapture
-              setTimeout(() => {
-                const video = videoMeRef.current;
-                const canvas = canvasMeRef.current;
-                // eslint-disable-next-line  no-null/no-null
-                if (video === null || canvas === null) return;
-                // show snapshot
-                context.drawImage(
-                  video,
-                  160,
-                  120,
-                  360,
-                  240,
-                  0,
-                  0,
-                  canvas.width,
-                  canvas.height,
-                );
-                const image = canvas.toDataURL('image/png');
-                setLastSnapshot(image);
-              }, SNAPSHOT_RATE / 5);
-            }
-          };
-
-          if (navigator.mediaDevices.getUserMedia) {
-            // TODO: Rewrite using async/await
-            navigator.mediaDevices
-              .getUserMedia({ video: true, audio: false })
-              .then((stream) => cbk(stream))
-              .catch((err) => console.error(err));
-          } else {
-            console.error(new Error(`${INIT}There is no user media`));
-          }
+      const cbk = (stream: MediaStream) => {
+        if (videoMeRef.current && context) {
+          videoMeRef.current.srcObject = stream;
+          // Wait some time beacuse the video is not ready
+          // FIX: Maybe there's a better way to do this.
+          // TRY: https://developer.mozilla.org/en-US/docs/Web/API/ImageCapture/ImageCapture
+          setTimeout(() => {
+            const video = videoMeRef.current;
+            const canvas = canvasMeRef.current;
+            // eslint-disable-next-line  no-null/no-null
+            if (video === null || canvas === null) return;
+            // show snapshot
+            context.drawImage(
+              video,
+              160,
+              120,
+              360,
+              240,
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+            );
+            const image = canvas.toDataURL('image/png');
+            setLastSnapshot(image);
+          }, SNAPSHOT_RATE / 5);
         }
-      }
-    };
+      };
 
-    let result: NodeJS.Timeout;
-    if (awareness) {
-      // get webcam snapshots every SNAPSHOT_RATE seconds
-      result = setInterval(getSnapshotVideo, SNAPSHOT_RATE);
+      if (navigator.mediaDevices.getUserMedia) {
+        // TODO: Rewrite using async/await
+        navigator.mediaDevices
+          .getUserMedia({ video: true, audio: false })
+          .then((stream) => cbk(stream))
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error(err);
+          });
+      } else {
+        // eslint-disable-next-line no-console
+        console.error(new Error(`${INIT}There is no user media`));
+      }
     }
-    return () => clearInterval(result);
-  }, [awareness]);
+  };
+
+  useInterval(() => {
+    getSnapshotVideo();
+  }, awareness ? SNAPSHOT_RATE : undefined);
 
   // GC that runs every GC_RATE seconds and checks if, for each participant,
   // their last snapshot was taken inside a REMOVE_THRESHOLD seconds time frame.
   // If not, it will remove the participant.
-  useEffect(() => {
-    const updateParticipants = () => {
-      console.log(INIT, 'Garbage collect participants');
-      participants.forEach((participant) => {
-        const removeThreshold = new Date().getTime() - REMOVE_THRESHOLD;
-        if (participant.timestamp && participant.timestamp < removeThreshold) {
-          console.log(INIT, 'Garbage collect participant', participant.id);
-          setParticipants(participants.filter((p) => p.id !== participant.id));
-        }
-      });
-      if (participants.length === 0) {
-        console.log(INIT, 'There is 1 participant left');
-      } else {
-        console.log(
-          INIT,
-          'There are',
-          1 + participants.length,
-          'participants left.',
-        );
+  const updateParticipants = () => {
+    participants.forEach((participant) => {
+      const removeThreshold = new Date().getTime() - REMOVE_THRESHOLD;
+      if (participant.timestamp && participant.timestamp < removeThreshold) {
+        setParticipants(participants.filter((p) => p.id !== participant.id));
       }
-    };
+    });
+  };
 
-    if (participants.length) {
-      let participantsInterval: NodeJS.Timeout;
-      if (awareness) {
-        participantsInterval = setInterval(updateParticipants, GC_RATE);
-      }
-      return () => clearInterval(participantsInterval);
-    }
-    return undefined;
-  }, [awareness, participants]);
+  useInterval(() => {
+    updateParticipants();
+  }, awareness && wsRef.current !== undefined ? GC_RATE : undefined);
 
-  // FIX: Make the function use the latest value of state.
-  // I think the issue arises when the callback is sent the value used is the one when timeout was called.
-  // async states?
-  useEffect(() => {
-    const sendUpdate = () => {
-      if (wsRef.current) {
-        const currentMessageId = messageId + 1;
-        setMessageId(currentMessageId);
-        const message = {
-          msgId: currentMessageId,
+  const sendUpdate = useCallback(() => {
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const message = {
+      msgId: currentMessageId,
+      id: userId,
+      type: 'app',
+      room: roomId,
+      data: {
+        type: 'update',
+        data: {
+          image: lastSnapshot,
+          timestamp: new Date().getTime(),
+          nickname,
           id: userId,
-          type: 'app',
-          room: roomId,
-          data: {
-            type: 'update',
-            data: {
-              image: lastSnapshot,
-              timestamp: new Date().getTime(),
-              nickname,
-              id: userId,
-            },
-          },
-        };
-        console.log(INIT, 'Updating with message: ', message);
-        wsRef.current.send(JSON.stringify(message));
-      }
+        },
+      },
     };
-    if (lastSnapshot !== undefined && userId !== undefined) {
-      let updateInterval: NodeJS.Timeout;
-      if (awareness) {
-        updateInterval = setInterval(sendUpdate, UPDATE_RATE);
-      }
-      return () => clearInterval(updateInterval);
-    }
-    return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [awareness, userId, messageId, nickname, roomId]);
+    // eslint-disable-next-line no-console
+    console.log(INIT, 'Updating with message: ', message);
+    wsRef.current?.send(JSON.stringify(message));
+  }, [userId, messageId, roomId, lastSnapshot, nickname]);
+
+  useInterval(() => {
+    sendUpdate();
+  }, awareness && connected && userId ? UPDATE_RATE : undefined);
 
   // TODO: Define the Heartbeat function to keep track user connection.
   // Keep Track of connection status
-  useEffect(() => {
-    const ping = () => {
-      const type = 'ping';
-      if (wsRef.current) {
-        const currentMessageId = messageId + 1;
-        setMessageId(currentMessageId);
-        const message = {
-          msgId: currentMessageId,
-          type,
-          room: roomId,
-          data: undefined,
-        };
-        console.log(INIT, `${type.toUpperCase()}: `, message);
-        wsRef.current.send(JSON.stringify(message));
-      }
+  const ping = () => {
+    const type = 'ping';
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const message = {
+      msgId: currentMessageId,
+      type,
+      room: roomId,
+      data: undefined,
     };
+    // eslint-disable-next-line no-console
+    console.log(INIT, `${type.toUpperCase()}: `, message);
+    wsRef.current?.send(JSON.stringify(message));
+  };
 
-    if (roomId !== undefined && userId !== undefined) {
-      let pingInterval: NodeJS.Timeout;
-      if (awareness) {
-        console.log(INIT, 'RUNNING PING INTERVAL EVERY ', PING_RATE);
-        pingInterval = setInterval(ping, PING_RATE);
-      }
-      return () => clearInterval(pingInterval);
-    }
-    return undefined;
-  }, [awareness, userId, messageId, roomId]);
+  useInterval(() => {
+    ping();
+  }, awareness && connected && userId ? PING_RATE : undefined);
 
   return (
     <div className="immedia-presence">
@@ -444,7 +440,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     </div>
   );
 };
-/* eslint-enable no-console */
+
 export default memo(
   withGlobal<OwnProps>((global): StateProps => {
     const { currentUserId } = global;
