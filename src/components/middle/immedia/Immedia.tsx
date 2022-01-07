@@ -159,6 +159,12 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     }
   };
 
+  useEffect(() => {
+    // log the number of participants in the room
+    // eslint-disable-next-line no-console
+    if (participants.length) console.log(INIT, `There are ${1 + participants.length} participants in the room`);
+  }, [participants]);
+
   const joinedParticipant = (participant: ParticipantsType) => {
     setParticipants([...participants, participant]);
   };
@@ -195,9 +201,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         // {type: 'left', data: ['idxxx', 'idyyy', ...]}
         messageData.forEach((id: string) => leftParticipant({ id }));
         break;
-      // default:
-      //   // eslint-disable-next-line no-console
-      //   console.log(INIT, 'UNKNOWN MESSAGE TYPE!');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participants]);
@@ -364,19 +367,17 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   // Keep Track of connection status
   const ping = () => {
     const type = 'ping';
-    if (wsRef.current) {
-      const currentMessageId = messageId + 1;
-      setMessageId(currentMessageId);
-      const message = {
-        msgId: currentMessageId,
-        type,
-        room: roomId,
-        data: undefined,
-      };
-      // eslint-disable-next-line no-console
-      console.log(INIT, `${type.toUpperCase()}: `, message);
-      wsRef.current.send(JSON.stringify(message));
-    }
+    const currentMessageId = messageId + 1;
+    setMessageId(currentMessageId);
+    const message = {
+      msgId: currentMessageId,
+      type,
+      room: roomId,
+      data: undefined,
+    };
+    // eslint-disable-next-line no-console
+    console.log(INIT, `${type.toUpperCase()}: `, message);
+    wsRef.current?.send(JSON.stringify(message));
   };
 
   useInterval(() => {
