@@ -64,8 +64,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const wsRef = useRef<WebSocket | undefined>(undefined);
   // eslint-disable-next-line  no-null/no-null
   const canvasMeRef = useRef<HTMLCanvasElement | null>(null);
-  // eslint-disable-next-line  no-null/no-null
-  const videoMeRef = useRef<HTMLVideoElement | null>(null);
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 
@@ -149,14 +147,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     setLastSnapshot(undefined);
     setUserId(undefined);
     setRoomId(undefined);
-    // TODO: Check how to clean up tracks when user changes chats
-    // FIX: Sometimes it works (i.e., disable webcam light), sometimes it doesn't.
-    if (videoMeRef.current) {
-      if (videoMeRef.current.srcObject) {
-        const tracks = (videoMeRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach((track) => track.stop());
-      }
-    }
   };
 
   useEffect(() => {
@@ -267,52 +257,42 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     if (awareness && participants.length) getParticipantsSnapshots();
   }, [participants, awareness]);
 
+  function gotMedia(mediaStream: MediaStream) {
+    const context = canvasMeRef.current?.getContext('2d');
+    const mediaStreamTrack = mediaStream.getVideoTracks()[0];
+    const imageCapture = new ImageCapture(mediaStreamTrack);
+
+    const canvas = canvasMeRef.current;
+    // eslint-disable-next-line  no-null/no-null
+    if (canvas === null) return;
+    imageCapture.grabFrame()
+      .then((imageBitmap) => {
+        canvas.width = imageBitmap.width;
+        canvas.height = imageBitmap.height;
+        context?.drawImage(imageBitmap, 160, 120, 360, 240, 0, 0, canvas?.width, canvas?.height);
+        // update my snapshot
+        const image = canvas.toDataURL('image/png');
+        setLastSnapshot(image);
+      })
+      .catch((error) => {
+      // eslint-disable-next-line no-console
+        console.error(`${INIT} grabFrame() error: ${error}`);
+      });
+  }
+
   const getSnapshotVideo = () => {
-    if (canvasMeRef.current) {
-      const context = canvasMeRef.current.getContext('2d');
-
-      const cbk = (stream: MediaStream) => {
-        if (videoMeRef.current && context) {
-          videoMeRef.current.srcObject = stream;
-          // Wait some time beacuse the video is not ready
-          // FIX: Maybe there's a better way to do this.
-          // TRY: https://developer.mozilla.org/en-US/docs/Web/API/ImageCapture/ImageCapture
-          setTimeout(() => {
-            const video = videoMeRef.current;
-            const canvas = canvasMeRef.current;
-            // eslint-disable-next-line  no-null/no-null
-            if (video === null || canvas === null) return;
-            // show snapshot
-            context.drawImage(
-              video,
-              160,
-              120,
-              360,
-              240,
-              0,
-              0,
-              canvas.width,
-              canvas.height,
-            );
-            const image = canvas.toDataURL('image/png');
-            setLastSnapshot(image);
-          }, SNAPSHOT_RATE / 5);
-        }
-      };
-
-      if (navigator.mediaDevices.getUserMedia) {
-        // TODO: Rewrite using async/await
-        navigator.mediaDevices
-          .getUserMedia({ video: true, audio: false })
-          .then((stream) => cbk(stream))
-          .catch((err) => {
-            // eslint-disable-next-line no-console
-            console.error(err);
-          });
-      } else {
-        // eslint-disable-next-line no-console
-        console.error(new Error(`${INIT}There is no user media`));
-      }
+    if (navigator.mediaDevices.getUserMedia) {
+      // TODO: Rewrite using async/await
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: false })
+        .then(gotMedia)
+        .catch((error) => {
+          // eslint-disable-next-line no-console
+          console.error(`${INIT} getUserMedia() error: ${error}`);
+        });
+    } else {
+      // eslint-disable-next-line no-console
+      console.error(new Error(`${INIT} There is no user media`));
     }
   };
 
@@ -395,13 +375,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         {awareness && (
           <div className="rows">
             <div key={userId} className="participant participant-me">
-              <video
-                ref={videoMeRef}
-                autoPlay
-                className="video-me"
-              >
-                <track kind="captions" />
-              </video>
               <canvas
                 ref={canvasMeRef}
                 className="photo-canvas"
