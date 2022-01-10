@@ -257,7 +257,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     if (awareness && participants.length) getParticipantsSnapshots();
   }, [participants, awareness]);
 
-  function gotMedia(mediaStream: MediaStream) {
+  const gotMedia = async (mediaStream: MediaStream) => {
     const context = canvasMeRef.current?.getContext('2d');
     const mediaStreamTrack = mediaStream.getVideoTracks()[0];
     const imageCapture = new ImageCapture(mediaStreamTrack);
@@ -265,31 +265,29 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     const canvas = canvasMeRef.current;
     // eslint-disable-next-line  no-null/no-null
     if (canvas === null) return;
-    imageCapture.grabFrame()
-      .then((imageBitmap) => {
-        canvas.width = imageBitmap.width;
-        canvas.height = imageBitmap.height;
-        context?.drawImage(imageBitmap, 160, 120, 360, 240, 0, 0, canvas?.width, canvas?.height);
-        // update my snapshot
-        const image = canvas.toDataURL('image/png');
-        setLastSnapshot(image);
-      })
-      .catch((error) => {
+    try {
+      const imageBitmap = await imageCapture.grabFrame();
+      canvas.width = imageBitmap.width;
+      canvas.height = imageBitmap.height;
+      context?.drawImage(imageBitmap, 160, 120, 360, 240, 0, 0, canvas?.width, canvas?.height);
+      // update my snapshot
+      const image = canvas.toDataURL('image/png');
+      setLastSnapshot(image);
+    } catch (error) {
       // eslint-disable-next-line no-console
-        console.error(`${INIT} grabFrame() error: ${error}`);
-      });
-  }
+      console.error(`${INIT} grabFrame() error: ${error}`);
+    }
+  };
 
-  const getSnapshotVideo = () => {
+  const getSnapshotVideo = async () => {
     if (navigator.mediaDevices.getUserMedia) {
-      // TODO: Rewrite using async/await
-      navigator.mediaDevices
-        .getUserMedia({ video: true, audio: false })
-        .then(gotMedia)
-        .catch((error) => {
-          // eslint-disable-next-line no-console
-          console.error(`${INIT} getUserMedia() error: ${error}`);
-        });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        gotMedia(stream);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(`${INIT} getUserMedia() error: ${error}`);
+      }
     } else {
       // eslint-disable-next-line no-console
       console.error(new Error(`${INIT} There is no user media`));
