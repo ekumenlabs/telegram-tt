@@ -280,17 +280,13 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   };
 
   const getSnapshotVideo = async () => {
-    if (navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        gotMedia(stream);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error(`${INIT} getUserMedia() error: ${error}`);
-      }
-    } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      await gotMedia(stream);
+      stream.getTracks().forEach((track) => track.stop());
+    } catch (error) {
       // eslint-disable-next-line no-console
-      console.error(new Error(`${INIT} There is no user media`));
+      console.error(`${INIT} getUserMedia() error: ${error}`);
     }
   };
 
