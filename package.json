@@ -51,6 +51,7 @@
     "@types/react-dom": "^17.0.9",
     "@types/resize-observer-browser": "^0.1.6",
     "@types/sockjs-client": "^1.5.1",
+    "@types/w3c-image-capture": "^1.0.5",
     "@types/wicg-mediasession": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^4.29.1",
     "@typescript-eslint/parser": "^4.29.1",
