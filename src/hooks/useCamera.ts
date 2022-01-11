@@ -17,10 +17,10 @@ const useCleanup = (val: HTMLVideoElement | undefined) => {
   }, []);
 };
 
-const initialiseCamera = async () => navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+const initializeCamera = () => navigator.mediaDevices.getUserMedia({ audio: false, video: true });
 
 export default function useCamera(videoRef: React.RefObject<HTMLVideoElement>) {
-  const [isCameraInitialised, setIsCameraInitialised] = useState(false);
+  const [isCameraInitialized, setIsCameraInitialized] = useState(false);
   const [video, setVideo] = useState<HTMLVideoElement | undefined>(undefined);
   const [error, setError] = useState('');
 
@@ -40,27 +40,27 @@ export default function useCamera(videoRef: React.RefObject<HTMLVideoElement>) {
   const gotStream = useCallback((stream: MediaStream) => {
     if (!video) return;
     video.srcObject = stream;
-    setIsCameraInitialised(true);
+    setIsCameraInitialized(true);
   }, [video]);
 
   useEffect(() => {
     async function initCamera() {
-      if (!video || isCameraInitialised) {
+      if (!video || isCameraInitialized) {
         return;
       }
-
       try {
-        const stream = await initialiseCamera();
+        const stream = await initializeCamera();
         gotStream(stream);
       } catch (err) {
         let message;
         if (err instanceof Error) message = err.message;
         else message = String(err);
         setError(message);
+        setIsCameraInitialized(false);
       }
     }
     initCamera();
-  }, [video, gotStream, isCameraInitialised]);
+  }, [video, gotStream, isCameraInitialized]);
 
-  return { video, isCameraInitialised, error };
+  return { video, isCameraInitialized, error };
 }

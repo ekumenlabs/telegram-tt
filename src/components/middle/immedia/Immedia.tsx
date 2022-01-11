@@ -67,9 +67,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const videoMeRef = createRef<HTMLVideoElement>();
   // eslint-disable-next-line  no-null/no-null
   const canvasMeRef = useRef<HTMLCanvasElement | null>(null);
-  const { isCameraInitialised, video, error } = useCamera(
-    videoMeRef,
-  );
+  const { isCameraInitialized, video, error } = useCamera(videoMeRef);
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 
@@ -286,7 +284,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   useInterval(() => {
     getSnapshotVideo();
-  }, isCameraInitialised ? SNAPSHOT_RATE : undefined);
+  }, isCameraInitialized ? SNAPSHOT_RATE : undefined);
 
   useEffect(() => {
     if (error) {
