@@ -294,7 +294,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
               canvas.width,
               canvas.height,
             );
-            const image = canvas.toDataURL('image/jpeg');
+            const image = canvas.toDataURL();
             setLastSnapshot(image);
           }, SNAPSHOT_RATE / 5);
         }
@@ -404,7 +404,8 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
               </video>
               <canvas
                 ref={canvasMeRef}
-                className="photo-canvas"
+                width="70"
+                height="50"
               />
               <text className="photo-caption">{nickname}</text>
             </div>
