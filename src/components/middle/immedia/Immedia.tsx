@@ -404,6 +404,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
               </video>
               <canvas
                 ref={canvasMeRef}
+                className="photo-canvas"
                 width="70"
                 height="50"
               />
