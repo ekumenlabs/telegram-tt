@@ -567,7 +567,7 @@ addReducer('openTelegramLink', (global, actions, payload) => {
     return;
   }
 
-  const chatOrChannelPostId = part2 ? Number(part2) : undefined;
+  const chatOrChannelPostId = part2 || undefined;
   const messageId = part3 ? Number(part3) : undefined;
   const commentId = params.comment ? Number(params.comment) : undefined;
 
@@ -577,15 +577,23 @@ addReducer('openTelegramLink', (global, actions, payload) => {
       inviteHash: params.voicechat || params.livestream,
     });
   } else if (part1 === 'c' && chatOrChannelPostId && messageId) {
+    const chatId = `-${chatOrChannelPostId}`;
+    const chat = selectChat(global, chatId);
+    if (!chat) {
+      actions.showNotification({ message: 'Chat does not exist' });
+      return;
+    }
+
     actions.focusMessage({
-      chatId: -chatOrChannelPostId,
+      chatId,
       messageId,
     });
   } else {
     actions.openChatByUsername({
       username: part1,
-      messageId: messageId || chatOrChannelPostId,
+      messageId: messageId || Number(chatOrChannelPostId),
       commentId,
+      startParam: params.start,
     });
   }
 });
@@ -603,7 +611,9 @@ addReducer('acceptInviteConfirmation', (global, actions, payload) => {
 });
 
 addReducer('openChatByUsername', (global, actions, payload) => {
-  const { username, messageId, commentId } = payload!;
+  const {
+    username, messageId, commentId, startParam,
+  } = payload!;
 
   (async () => {
     const chat = selectCurrentChat(global);
@@ -613,7 +623,7 @@ addReducer('openChatByUsername', (global, actions, payload) => {
         actions.focusMessage({ chatId: chat.id, messageId });
         return;
       }
-      await openChatByUsername(actions, username, messageId);
+      await openChatByUsername(actions, username, messageId, startParam);
       return;
     }
 
@@ -753,8 +763,8 @@ addReducer('updateChatAdmin', (global, actions, payload) => {
       chat, user, adminRights, customTitle,
     });
 
+    const chatAfterUpdate = await callApi('fetchFullChat', chat);
     const newGlobal = getGlobal();
-    const chatAfterUpdate = selectChat(newGlobal, chatId);
 
     if (!chatAfterUpdate || !chatAfterUpdate.fullInfo) {
       return;
@@ -981,6 +991,17 @@ addReducer('deleteChatMember', (global, actions, payload) => {
     await callApi('deleteChatMember', chat, user);
     loadFullChat(chat);
   })();
+});
+
+addReducer('toggleIsProtected', (global, actions, payload) => {
+  const { chatId, isProtected } = payload;
+  const chat = selectChat(global, chatId);
+
+  if (!chat) {
+    return;
+  }
+
+  void callApi('toggleIsProtected', { chat, isProtected });
 });
 
 async function loadChats(listType: 'active' | 'archived', offsetId?: string, offsetDate?: number) {
@@ -1251,6 +1272,7 @@ async function openChatByUsername(
   actions: GlobalActions,
   username: string,
   channelPostId?: number,
+  startParam?: string,
 ) {
   // Open temporary empty chat to make the click response feel faster
   actions.openChat({ id: TMP_CHAT_ID });
@@ -1267,6 +1289,9 @@ async function openChatByUsername(
     actions.focusMessage({ chatId: chat.id, messageId: channelPostId });
   } else {
     actions.openChat({ id: chat.id });
+  }
+  if (startParam) {
+    actions.startBot({ botId: chat.id, param: startParam });
   }
 }
 

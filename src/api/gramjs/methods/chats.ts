@@ -30,7 +30,6 @@ import {
 import { buildApiMessage, buildMessageDraft } from '../apiBuilders/messages';
 import { buildApiUser, buildApiUsersAndStatuses } from '../apiBuilders/users';
 import { buildCollectionByKey } from '../../../util/iteratees';
-import localDb from '../localDb';
 import {
   buildInputEntity,
   buildInputPeer,
@@ -40,8 +39,9 @@ import {
   buildChatBannedRights,
   buildChatAdminRights,
 } from '../gramjsBuilders';
-import { addChatToLocalDb, addMessageToLocalDb } from '../helpers';
+import { addEntitiesWithPhotosToLocalDb, addMessageToLocalDb, addPhotoToLocalDb } from '../helpers';
 import { buildApiPeerId, getApiChatIdFromMtpPeer } from '../apiBuilders/peers';
+import { buildApiPhoto } from '../apiBuilders/common';
 
 const MAX_INT_32 = 2 ** 31 - 1;
 let onUpdate: OnApiUpdate;
@@ -403,6 +403,7 @@ async function getFullChannelInfo(
     hiddenPrehistory,
     call,
     botInfo,
+    defaultSendAs,
   } = result.fullChat;
 
   const inviteLink = exportedInvite instanceof GramJs.ChatInviteExported
@@ -453,6 +454,7 @@ async function getFullChannelInfo(
       groupCallId: call ? String(call.id) : undefined,
       linkedChatId: linkedChatId ? buildApiPeerId(linkedChatId, 'chat') : undefined,
       botCommands,
+      sendAsId: defaultSendAs ? getApiChatIdFromMtpPeer(defaultSendAs) : undefined,
     },
     users: [...(users || []), ...(bannedUsers || []), ...(adminUsers || [])],
     groupCall: call ? {
@@ -1004,13 +1006,24 @@ export async function openChatByInvite(hash: string) {
   let chat: ApiChat | undefined;
 
   if (result instanceof GramJs.ChatInvite) {
+    const {
+      photo, participantsCount, title, channel, requestNeeded, about,
+    } = result;
+
+    if (photo instanceof GramJs.Photo) {
+      addPhotoToLocalDb(result.photo);
+    }
+
     onUpdate({
       '@type': 'showInvite',
       data: {
-        title: result.title,
+        title,
+        about,
         hash,
-        participantsCount: result.participantsCount,
-        isChannel: result.channel,
+        participantsCount,
+        isChannel: channel,
+        isRequestNeeded: requestNeeded,
+        ...(photo instanceof GramJs.Photo && { photo: buildApiPhoto(photo) }),
       },
     });
   } else {
@@ -1105,15 +1118,11 @@ function updateLocalDb(result: (
   GramJs.messages.Chats | GramJs.messages.ChatsSlice | GramJs.TypeUpdates
 )) {
   if ('users' in result) {
-    result.users.forEach((user) => {
-      if (user instanceof GramJs.User) {
-        localDb.users[buildApiPeerId(user.id, 'user')] = user;
-      }
-    });
+    addEntitiesWithPhotosToLocalDb(result.users);
   }
 
   if ('chats' in result) {
-    result.chats.forEach(addChatToLocalDb);
+    addEntitiesWithPhotosToLocalDb(result.chats);
   }
 
   if ('messages' in result) {
@@ -1132,4 +1141,15 @@ export async function importChatInvite({ hash }: { hash: string }) {
   }
 
   return buildApiChatFromPreview(updates.chats[0]);
+}
+
+export function toggleIsProtected({
+  chat, isProtected,
+}: { chat: ApiChat; isProtected: boolean }) {
+  const { id, accessHash } = chat;
+
+  return invokeRequest(new GramJs.messages.ToggleNoForwards({
+    peer: buildInputPeer(id, accessHash),
+    enabled: isProtected,
+  }), true);
 }

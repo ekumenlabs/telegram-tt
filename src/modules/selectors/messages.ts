@@ -855,3 +855,28 @@ export function selectLastServiceNotification(global: GlobalState) {
 
   return serviceNotifications.find(({ id }) => id === maxId);
 }
+
+export function selectIsMessageProtected(global: GlobalState, message?: ApiMessage) {
+  return message ? message.isProtected || selectChat(global, message.chatId)?.isProtected : false;
+}
+
+export function selectHasProtectedMessage(global: GlobalState, chatId: string, messageIds?: number[]) {
+  if (selectChat(global, chatId)?.isProtected) {
+    return true;
+  }
+
+  if (!messageIds) {
+    return false;
+  }
+
+  const messages = selectChatMessages(global, chatId);
+
+  return messageIds.some((messageId) => messages[messageId]?.isProtected);
+}
+
+export function selectSponsoredMessage(global: GlobalState, chatId: string) {
+  const chat = selectChat(global, chatId);
+  const message = chat && isChatChannel(chat) ? global.messages.sponsoredByChatId[chatId] : undefined;
+
+  return message && message.expiresAt >= Math.round(Date.now() / 1000) ? message : undefined;
+}

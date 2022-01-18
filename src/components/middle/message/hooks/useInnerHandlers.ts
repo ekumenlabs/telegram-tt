@@ -15,6 +15,7 @@ export default function useInnerHandlers(
   chatId: string,
   threadId: number,
   isInDocumentGroup: boolean,
+  asForwarded?: boolean,
   isScheduled?: boolean,
   isChatWithRepliesBot?: boolean,
   album?: IAlbum,
@@ -50,12 +51,16 @@ export default function useInnerHandlers(
       return;
     }
 
-    if (isUserId(senderPeer.id)) {
+    if (asForwarded && forwardInfo?.channelPostId) {
+      focusMessage({ chatId: senderPeer.id, messageId: forwardInfo.channelPostId });
+    } else if (isUserId(senderPeer.id)) {
       openUserInfo({ id: senderPeer.id });
     } else {
       openChat({ id: senderPeer.id });
     }
-  }, [senderPeer, showNotification, lang, openUserInfo, openChat]);
+  }, [
+    asForwarded, focusMessage, forwardInfo, lang, openChat, openUserInfo, senderPeer, showNotification,
+  ]);
 
   const handleViaBotClick = useCallback(() => {
     if (!botSender) {

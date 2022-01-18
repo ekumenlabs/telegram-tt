@@ -1,12 +1,12 @@
 import React, {
   FC, memo, useCallback, useEffect, useMemo, useRef, useState,
 } from '../../lib/teact/teact';
-import { getGlobal, withGlobal } from '../../lib/teact/teactn';
+import { getDispatch, getGlobal, withGlobal } from '../../lib/teact/teactn';
 
 import {
   ApiMessage, ApiRestrictionReason, MAIN_THREAD_ID,
 } from '../../api/types';
-import { GlobalActions, MessageListType } from '../../global/types';
+import { MessageListType } from '../../global/types';
 import { LoadMoreDirection } from '../../types';
 
 import { ANIMATION_END_DELAY, LOCAL_MESSAGE_ID_BASE, MESSAGE_LIST_SLICE } from '../../config';
@@ -32,7 +32,7 @@ import {
   isChatWithRepliesBot,
   isChatGroup,
 } from '../../modules/helpers';
-import { orderBy, pick } from '../../util/iteratees';
+import { orderBy } from '../../util/iteratees';
 import { fastRaf, debounce, onTickEnd } from '../../util/schedulers';
 import useLayoutEffectWithPrevDeps from '../../hooks/useLayoutEffectWithPrevDeps';
 import useEffectWithPrevDeps from '../../hooks/useEffectWithPrevDeps';
@@ -42,7 +42,7 @@ import { preventMessageInputBlur } from './helpers/preventMessageInputBlur';
 import useOnChange from '../../hooks/useOnChange';
 import useStickyDates from './hooks/useStickyDates';
 import { dispatchHeavyAnimationEvent } from '../../hooks/useHeavyAnimationCheck';
-import resetScroll from '../../util/resetScroll';
+import resetScroll, { patchChromiumScroll } from '../../util/resetScroll';
 import fastSmoothScroll, { isAnimatingScroll } from '../../util/fastSmoothScroll';
 import renderText from '../common/helpers/renderText';
 import useLang from '../../hooks/useLang';
@@ -89,9 +89,8 @@ type StateProps = {
   threadTopMessageId?: number;
   threadFirstMessageId?: number;
   hasLinkedChat?: boolean;
+  lastSyncTime?: number;
 };
-
-type DispatchProps = Pick<GlobalActions, 'loadViewportMessages' | 'setScrollOffset' | 'openHistoryCalendar'>;
 
 const BOTTOM_THRESHOLD = 20;
 const UNREAD_DIVIDER_TOP = 10;
@@ -104,7 +103,7 @@ const UNREAD_DIVIDER_CLASS = 'unread-divider';
 
 const runDebouncedForScroll = debounce((cb) => cb(), SCROLL_DEBOUNCE, false);
 
-const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
+const MessageList: FC<OwnProps & StateProps> = ({
   chatId,
   threadId,
   type,
@@ -129,15 +128,15 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
   restrictionReason,
   focusingId,
   isSelectModeActive,
-  loadViewportMessages,
-  setScrollOffset,
   lastMessage,
   botDescription,
   threadTopMessageId,
   hasLinkedChat,
+  lastSyncTime,
   withBottomShift,
-  openHistoryCalendar,
 }) => {
+  const { loadViewportMessages, setScrollOffset, loadSponsoredMessages } = getDispatch();
+
   // eslint-disable-next-line no-null/no-null
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -170,6 +169,12 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
   useOnChange(() => {
     memoFirstUnreadIdRef.current = firstUnreadId;
   }, [firstUnreadId]);
+
+  useOnChange(() => {
+    if (isChannelChat && isReady && lastSyncTime) {
+      loadSponsoredMessages({ chatId });
+    }
+  }, [chatId, isReady, isChannelChat, lastSyncTime]);
 
   // Updated only once when messages are loaded (as we want the unread divider to keep its position)
   useOnChange(() => {
@@ -210,11 +215,16 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
 
   const { isScrolled, updateStickyDates } = useStickyDates();
 
+  const isScrollingRef = useRef<boolean>();
+  const isScrollPatchNeededRef = useRef<boolean>();
+
   const handleScroll = useCallback(() => {
     if (isScrollTopJustUpdatedRef.current) {
       isScrollTopJustUpdatedRef.current = false;
       return;
     }
+
+    isScrollingRef.current = true;
 
     const container = containerRef.current!;
 
@@ -223,6 +233,8 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
     }
 
     runDebouncedForScroll(() => {
+      isScrollingRef.current = false;
+
       fastRaf(() => {
         if (!container.parentElement) {
           return;
@@ -292,7 +304,7 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
 
   // Remember scroll position before repositioning it
   useOnChange(() => {
-    if (!messageIds || !listItemElementsRef.current || !isReady) {
+    if (!messageIds || !listItemElementsRef.current) {
       return;
     }
 
@@ -309,7 +321,7 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
     anchorIdRef.current = anchor.id;
     anchorTopRef.current = anchor.getBoundingClientRect().top;
     // This should match deps for `useLayoutEffectWithPrevDeps` below
-  }, [messageIds, isViewportNewest, containerHeight, hasTools, isReady]);
+  }, [messageIds, isViewportNewest, containerHeight, hasTools]);
 
   // Handles updated message list, takes care of scroll repositioning
   useLayoutEffectWithPrevDeps(([
@@ -319,11 +331,6 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
   ]) => {
     const container = containerRef.current!;
     listItemElementsRef.current = Array.from(container.querySelectorAll<HTMLDivElement>('.message-list-item'));
-
-    // During animation
-    if (!container.offsetParent) {
-      return;
-    }
 
     const hasLastMessageChanged = (
       messageIds && prevMessageIds && messageIds[messageIds.length - 1] !== prevMessageIds[prevMessageIds.length - 1]
@@ -355,7 +362,7 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
     }
 
     const { scrollTop, scrollHeight, offsetHeight } = container;
-    const scrollOffset = scrollOffsetRef.current!;
+    const scrollOffset = scrollOffsetRef.current;
     const lastItemElement = listItemElementsRef.current[listItemElementsRef.current.length - 1];
 
     let bottomOffset = scrollOffset - (prevContainerHeight || offsetHeight);
@@ -397,7 +404,7 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
     }
 
     const isResized = prevContainerHeight !== undefined && prevContainerHeight !== containerHeight;
-    const anchor = anchorIdRef.current && document.getElementById(anchorIdRef.current);
+    const anchor = anchorIdRef.current && container.querySelector(`#${anchorIdRef.current}`);
     const unreadDivider = (
       !anchor
       && memoUnreadDividerBeforeIdRef.current
@@ -411,6 +418,11 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
 
       newScrollTop = scrollHeight - offsetHeight;
     } else if (anchor) {
+      if (isScrollPatchNeededRef.current) {
+        isScrollPatchNeededRef.current = false;
+        patchChromiumScroll(container);
+      }
+
       const newAnchorTop = anchor.getBoundingClientRect().top;
       newScrollTop = scrollTop + (newAnchorTop - (anchorTopRef.current || 0));
     } else if (unreadDivider) {
@@ -502,6 +514,7 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
         />
       ) : ((messageIds && messageGroups) || lastMessage) ? (
         <MessageListContent
+          chatId={chatId}
           messageIds={messageIds || [lastMessage!.id]}
           messageGroups={messageGroups || groupMessages([lastMessage!])}
           isViewportNewest={Boolean(isViewportNewest)}
@@ -515,13 +528,14 @@ const MessageList: FC<OwnProps & StateProps & DispatchProps> = ({
           threadId={threadId}
           type={type}
           isReady={isReady}
+          isScrollingRef={isScrollingRef}
+          isScrollPatchNeededRef={isScrollPatchNeededRef}
           threadTopMessageId={threadTopMessageId}
           hasLinkedChat={hasLinkedChat}
           isSchedule={messageGroups ? type === 'scheduled' : false}
           noAppearanceAnimation={!messageGroups || !shouldAnimateAppearanceRef.current}
           onFabToggle={onFabToggle}
           onNotchToggle={onNotchToggle}
-          openHistoryCalendar={openHistoryCalendar}
         />
       ) : (
         <Loading color="white" />
@@ -590,12 +604,8 @@ export default memo(withGlobal<OwnProps>(
       hasLinkedChat: chat.fullInfo && ('linkedChatId' in chat.fullInfo)
         ? Boolean(chat.fullInfo.linkedChatId)
         : undefined,
+      lastSyncTime: global.lastSyncTime,
       ...(withLastMessageWhenPreloading && { lastMessage }),
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, [
-    'loadViewportMessages',
-    'setScrollOffset',
-    'openHistoryCalendar',
-  ]),
 )(MessageList));

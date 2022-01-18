@@ -13,11 +13,13 @@ import {
   ApiMessageEntityTypes,
   ApiNewPoll,
   ApiReportReason,
+  ApiSendMessageAction,
   ApiSticker,
   ApiVideo,
 } from '../../types';
 import localDb from '../localDb';
 import { pick } from '../../../util/iteratees';
+import { deserializeBytes } from '../helpers';
 
 const CHANNEL_ID_MIN_LENGTH = 11; // Example: -1000000000
 
@@ -165,7 +167,9 @@ export function buildInputPoll(pollParams: ApiNewPoll, randomId: BigInt.BigInteg
     id: randomId,
     publicVoters: summary.isPublic,
     question: summary.question,
-    answers: summary.answers.map(({ text, option }) => new GramJs.PollAnswer({ text, option: Buffer.from(option) })),
+    answers: summary.answers.map(({ text, option }) => {
+      return new GramJs.PollAnswer({ text, option: deserializeBytes(option) });
+    }),
     quiz: summary.quiz,
     multipleChoice: summary.multipleChoice,
   });
@@ -174,7 +178,7 @@ export function buildInputPoll(pollParams: ApiNewPoll, randomId: BigInt.BigInteg
     return new GramJs.InputMediaPoll({ poll });
   }
 
-  const correctAnswers = quiz.correctAnswers.map((key) => Buffer.from(key));
+  const correctAnswers = quiz.correctAnswers.map(deserializeBytes);
   const { solution } = quiz;
   const solutionEntities = quiz.solutionEntities ? quiz.solutionEntities.map(buildMtpMessageEntity) : [];
 
@@ -418,6 +422,20 @@ export function buildInputReportReason(reason: ApiReportReason) {
       return new GramJs.InputReportReasonOther();
   }
 
+  return undefined;
+}
+
+export function buildSendMessageAction(action: ApiSendMessageAction) {
+  switch (action.type) {
+    case 'cancel':
+      return new GramJs.SendMessageCancelAction();
+    case 'typing':
+      return new GramJs.SendMessageTypingAction();
+    case 'recordAudio':
+      return new GramJs.SendMessageRecordAudioAction();
+    case 'chooseSticker':
+      return new GramJs.SendMessageChooseStickerAction();
+  }
   return undefined;
 }
 

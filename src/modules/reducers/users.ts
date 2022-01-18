@@ -1,7 +1,7 @@
 import { GlobalState } from '../../global/types';
 import { ApiUser, ApiUserStatus } from '../../api/types';
 
-import { mapValues, omit, pick } from '../../util/iteratees';
+import { omit, pick } from '../../util/iteratees';
 import { MEMO_EMPTY_ARRAY } from '../../util/memo';
 
 export function replaceUsers(global: GlobalState, newById: Record<string, ApiUser>): GlobalState {
@@ -40,6 +40,9 @@ export function updateUser(global: GlobalState, userId: string, userUpdate: Part
   const { byId } = global.users;
 
   const updatedUser = getUpdatedUser(global, userId, userUpdate);
+  if (!updatedUser) {
+    return global;
+  }
 
   global = updateContactList(global, [updatedUser]);
 
@@ -50,9 +53,14 @@ export function updateUser(global: GlobalState, userId: string, userUpdate: Part
 }
 
 export function updateUsers(global: GlobalState, newById: Record<string, ApiUser>): GlobalState {
-  const updatedById = mapValues(newById, (user, id) => {
-    return getUpdatedUser(global, id, user);
-  });
+  const updatedById = Object.keys(newById).reduce((acc: Record<string, ApiUser>, id) => {
+    const updatedUser = getUpdatedUser(global, id, newById[id]);
+    if (updatedUser) {
+      acc[id] = updatedUser;
+    }
+
+    return acc;
+  }, {});
 
   global = replaceUsers(global, {
     ...global.users.byId,
@@ -67,20 +75,22 @@ export function updateUsers(global: GlobalState, newById: Record<string, ApiUser
 // @optimization Allows to avoid redundant updates which cause a lot of renders
 export function addUsers(global: GlobalState, newById: Record<string, ApiUser>): GlobalState {
   const { byId } = global.users;
-  let isAdded = false;
+  let isUpdated = false;
 
   const addedById = Object.keys(newById).reduce<Record<string, ApiUser>>((acc, id) => {
     if (!byId[id] || (byId[id].isMin && !newById[id].isMin)) {
-      acc[id] = getUpdatedUser(global, id, newById[id]);
-
-      if (!isAdded) {
-        isAdded = true;
+      const updatedUser = getUpdatedUser(global, id, newById[id]);
+      if (updatedUser) {
+        acc[id] = updatedUser;
+        if (!isUpdated) {
+          isUpdated = true;
+        }
       }
     }
     return acc;
   }, {});
 
-  if (!isAdded) {
+  if (!isUpdated) {
     return global;
   }
 
@@ -106,7 +116,7 @@ function getUpdatedUser(global: GlobalState, userId: string, userUpdate: Partial
   };
 
   if (!updatedUser.id || !updatedUser.type) {
-    return user;
+    return undefined;
   }
 
   return updatedUser;
@@ -126,10 +136,9 @@ export function updateSelectedUserId(global: GlobalState, selectedId?: string): 
   };
 }
 
-export function deleteUser(global: GlobalState, userId: string): GlobalState {
+export function deleteContact(global: GlobalState, userId: string): GlobalState {
   const { byId } = global.users;
   const { userIds } = global.contactList || {};
-  delete byId[userId];
 
   global = {
     ...global,
@@ -138,7 +147,13 @@ export function deleteUser(global: GlobalState, userId: string): GlobalState {
     },
   };
 
-  return replaceUsers(global, byId);
+  return replaceUsers(global, {
+    ...byId,
+    [userId]: {
+      ...byId[userId],
+      isContact: undefined,
+    },
+  });
 }
 
 export function updateUserSearch(

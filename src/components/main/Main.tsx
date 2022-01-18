@@ -1,17 +1,15 @@
 import React, {
   FC, useEffect, memo, useCallback,
 } from '../../lib/teact/teact';
-import { getGlobal, withGlobal } from '../../lib/teact/teactn';
+import { getDispatch, getGlobal, withGlobal } from '../../lib/teact/teactn';
 
 import { LangCode } from '../../types';
-import { GlobalActions } from '../../global/types';
 import { ApiMessage } from '../../api/types';
 
 import '../../modules/actions/all';
 import {
   BASE_EMOJI_KEYWORD_LANG, DEBUG, INACTIVE_MARKER, PAGE_TITLE,
 } from '../../config';
-import { pick } from '../../util/iteratees';
 import {
   selectChatMessage,
   selectCountNotMutedUnread,
@@ -25,6 +23,7 @@ import buildClassName from '../../util/buildClassName';
 import { fastRaf } from '../../util/schedulers';
 import { waitForTransitionEnd } from '../../util/cssAnimationEndListeners';
 import { processDeepLink } from '../../util/deeplink';
+import stopEvent from '../../util/stopEvent';
 import windowSize from '../../util/windowSize';
 import useShowTransition from '../../hooks/useShowTransition';
 import useBackgroundMode from '../../hooks/useBackgroundMode';
@@ -70,13 +69,8 @@ type StateProps = {
   language?: LangCode;
   wasTimeFormatSetManually?: boolean;
   isCallFallbackConfirmOpen: boolean;
+  addedSetIds?: string[];
 };
-
-type DispatchProps = Pick<GlobalActions, (
-  'loadAnimatedEmojis' | 'loadNotificationSettings' | 'loadNotificationExceptions' | 'updateIsOnline' |
-  'loadTopInlineBots' | 'loadEmojiKeywords' | 'openStickerSetShortName' |
-  'loadCountryList' | 'ensureTimeFormat' | 'checkVersionNotification'
-)>;
 
 const NOTIFICATION_INTERVAL = 1000;
 
@@ -85,7 +79,7 @@ let notificationInterval: number | undefined;
 // eslint-disable-next-line @typescript-eslint/naming-convention
 let DEBUG_isLogged = false;
 
-const Main: FC<StateProps & DispatchProps> = ({
+const Main: FC<StateProps> = ({
   lastSyncTime,
   isLeftColumnShown,
   isRightColumnShown,
@@ -104,17 +98,25 @@ const Main: FC<StateProps & DispatchProps> = ({
   language,
   wasTimeFormatSetManually,
   isCallFallbackConfirmOpen,
-  loadAnimatedEmojis,
-  loadNotificationSettings,
-  loadNotificationExceptions,
-  updateIsOnline,
-  loadTopInlineBots,
-  loadEmojiKeywords,
-  loadCountryList,
-  ensureTimeFormat,
-  openStickerSetShortName,
-  checkVersionNotification,
+  addedSetIds,
 }) => {
+  const {
+    loadAnimatedEmojis,
+    loadNotificationSettings,
+    loadNotificationExceptions,
+    updateIsOnline,
+    loadTopInlineBots,
+    loadEmojiKeywords,
+    loadCountryList,
+    loadStickerSets,
+    loadAddedStickers,
+    loadFavoriteStickers,
+    ensureTimeFormat,
+    openStickerSetShortName,
+    checkVersionNotification,
+  } = getDispatch();
+  const isSynced = Boolean(lastSyncTime);
+
   if (DEBUG && !DEBUG_isLogged) {
     DEBUG_isLogged = true;
     // eslint-disable-next-line no-console
@@ -146,6 +148,18 @@ const Main: FC<StateProps & DispatchProps> = ({
       loadCountryList({ langCode: language });
     }
   }, [language, lastSyncTime, loadCountryList, loadEmojiKeywords]);
+
+  // Sticker sets
+  useEffect(() => {
+    if (isSynced) {
+      if (!addedSetIds) {
+        loadStickerSets();
+        loadFavoriteStickers();
+      } else {
+        loadAddedStickers();
+      }
+    }
+  }, [isSynced, addedSetIds, loadStickerSets, loadFavoriteStickers, loadAddedStickers]);
 
   // Check version when service chat is ready
   useEffect(() => {
@@ -278,11 +292,6 @@ const Main: FC<StateProps & DispatchProps> = ({
 
   usePreventPinchZoomGesture(isMediaViewerOpen);
 
-  function stopEvent(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
   return (
     <div id="Main" className={className} onDrop={stopEvent} onDragOver={stopEvent}>
       <LeftColumn />
@@ -360,11 +369,7 @@ export default memo(withGlobal(
       language,
       wasTimeFormatSetManually,
       isCallFallbackConfirmOpen: Boolean(global.groupCalls.isFallbackConfirmOpen),
+      addedSetIds: global.stickers.added.setIds,
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, [
-    'loadAnimatedEmojis', 'loadNotificationSettings', 'loadNotificationExceptions', 'updateIsOnline',
-    'loadTopInlineBots', 'loadEmojiKeywords', 'openStickerSetShortName', 'loadCountryList', 'ensureTimeFormat',
-    'checkVersionNotification',
-  ]),
 )(Main));

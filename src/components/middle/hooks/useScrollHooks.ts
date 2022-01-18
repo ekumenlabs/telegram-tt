@@ -5,10 +5,10 @@ import { useMemo, useRef } from '../../../lib/teact/teact';
 import { LoadMoreDirection } from '../../../types';
 import { MessageListType } from '../../../global/types';
 
+import { LOCAL_MESSAGE_ID_BASE, MESSAGE_LIST_SLICE } from '../../../config';
+import { IS_SCROLL_PATCH_NEEDED, MESSAGE_LIST_SENSITIVE_AREA } from '../../../util/environment';
 import { debounce } from '../../../util/schedulers';
 import { useIntersectionObserver, useOnIntersect } from '../../../hooks/useIntersectionObserver';
-import { LOCAL_MESSAGE_ID_BASE, MESSAGE_LIST_SENSITIVE_AREA } from '../../../config';
-import resetScroll from '../../../util/resetScroll';
 import useOnChange from '../../../hooks/useOnChange';
 
 const FAB_THRESHOLD = 50;
@@ -24,6 +24,8 @@ export default function useScrollHooks(
   onFabToggle: AnyToVoidFunction,
   onNotchToggle: AnyToVoidFunction,
   isReady: boolean,
+  isScrollingRef: { current: boolean | undefined },
+  isScrollPatchNeededRef: { current: boolean | undefined },
 ) {
   const { loadViewportMessages } = getDispatch();
 
@@ -91,10 +93,14 @@ export default function useScrollHooks(
     const { target } = triggerEntry;
 
     if (target.className === 'backwards-trigger') {
-      resetScroll(containerRef.current!);
+      if (
+        IS_SCROLL_PATCH_NEEDED && isScrollingRef.current && messageIds.length <= MESSAGE_LIST_SLICE
+      ) {
+        isScrollPatchNeededRef.current = true;
+      }
+
       loadMoreBackwards();
     } else if (target.className === 'forwards-trigger') {
-      resetScroll(containerRef.current!);
       loadMoreForwards();
     }
   });

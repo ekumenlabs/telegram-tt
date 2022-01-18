@@ -1,14 +1,12 @@
 import React, {
   FC, memo, useCallback, useEffect, useRef, useState,
 } from '../../lib/teact/teact';
-import { withGlobal } from '../../lib/teact/teactn';
+import { getDispatch, withGlobal } from '../../lib/teact/teactn';
 
-import { GlobalActions } from '../../global/types';
 import { ManagementScreens, ProfileState } from '../../types';
 
 import { IS_SINGLE_COLUMN_LAYOUT } from '../../util/environment';
 import { debounce } from '../../util/schedulers';
-import { pick } from '../../util/iteratees';
 import buildClassName from '../../util/buildClassName';
 import {
   selectChat,
@@ -59,11 +57,6 @@ type StateProps = {
   gifSearchQuery?: string;
 };
 
-type DispatchProps = Pick<GlobalActions, (
-  'setLocalTextSearchQuery' | 'setStickerSearchQuery' | 'setGifSearchQuery' |
-  'searchTextMessagesLocal' | 'toggleManagement' | 'openHistoryCalendar' | 'addContact'
-)>;
-
 const COLUMN_CLOSE_DELAY_MS = 300;
 const runDebouncedForSearch = debounce((cb) => cb(), 200, false);
 
@@ -84,14 +77,16 @@ enum HeaderContent {
   ManageGroupUserPermissions,
   ManageGroupRecentActions,
   ManageGroupAdminRights,
+  ManageGroupNewAdminRights,
   ManageGroupMembers,
+  ManageGroupAddAdmins,
   StickerSearch,
   GifSearch,
   PollResults,
   AddingMembers,
 }
 
-const RightHeader: FC<OwnProps & StateProps & DispatchProps> = ({
+const RightHeader: FC<OwnProps & StateProps> = ({
   isColumnOpen,
   isProfile,
   isSearch,
@@ -110,15 +105,17 @@ const RightHeader: FC<OwnProps & StateProps & DispatchProps> = ({
   messageSearchQuery,
   stickerSearchQuery,
   gifSearchQuery,
-  setLocalTextSearchQuery,
-  setStickerSearchQuery,
-  setGifSearchQuery,
-  searchTextMessagesLocal,
-  toggleManagement,
-  openHistoryCalendar,
   shouldSkipAnimation,
-  addContact,
 }) => {
+  const {
+    setLocalTextSearchQuery,
+    setStickerSearchQuery,
+    setGifSearchQuery,
+    searchTextMessagesLocal,
+    toggleManagement,
+    openHistoryCalendar, addContact,
+  } = getDispatch();
+
   // eslint-disable-next-line no-null/no-null
   const backButtonRef = useRef<HTMLDivElement>(null);
 
@@ -192,8 +189,12 @@ const RightHeader: FC<OwnProps & StateProps & DispatchProps> = ({
       HeaderContent.ManageGroupRecentActions
     ) : managementScreen === ManagementScreens.ChatAdminRights ? (
       HeaderContent.ManageGroupAdminRights
+    ) : managementScreen === ManagementScreens.ChatNewAdminRights ? (
+      HeaderContent.ManageGroupNewAdminRights
     ) : managementScreen === ManagementScreens.GroupMembers ? (
       HeaderContent.ManageGroupMembers
+    ) : managementScreen === ManagementScreens.GroupAddAdmins ? (
+      HeaderContent.ManageGroupAddAdmins
     ) : undefined // Never reached
   ) : undefined; // When column is closed
 
@@ -227,7 +228,7 @@ const RightHeader: FC<OwnProps & StateProps & DispatchProps> = ({
           </>
         );
       case HeaderContent.AddingMembers:
-        return <h3>{lang('GroupAddMembers')}</h3>;
+        return <h3>{lang(isChannel ? 'ChannelAddSubscribers' : 'GroupAddMembers')}</h3>;
       case HeaderContent.ManageInitial:
         return <h3>{lang('Edit')}</h3>;
       case HeaderContent.ManageChatPrivacyType:
@@ -240,6 +241,8 @@ const RightHeader: FC<OwnProps & StateProps & DispatchProps> = ({
         return <h3>{lang('Group.Info.AdminLog')}</h3>;
       case HeaderContent.ManageGroupAdminRights:
         return <h3>{lang('EditAdminRights')}</h3>;
+      case HeaderContent.ManageGroupNewAdminRights:
+        return <h3>{lang('SetAsAdmin')}</h3>;
       case HeaderContent.ManageGroupPermissions:
         return <h3>{lang('ChannelPermissions')}</h3>;
       case HeaderContent.ManageGroupRemovedUsers:
@@ -248,6 +251,8 @@ const RightHeader: FC<OwnProps & StateProps & DispatchProps> = ({
         return <h3>{lang('ChannelAddException')}</h3>;
       case HeaderContent.ManageGroupUserPermissions:
         return <h3>{lang('UserRestrictions')}</h3>;
+      case HeaderContent.ManageGroupAddAdmins:
+        return <h3>{lang('Channel.Management.AddModerator')}</h3>;
       case HeaderContent.StickerSearch:
         return (
           <SearchInput
@@ -372,13 +377,4 @@ export default memo(withGlobal<OwnProps>(
       gifSearchQuery,
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, [
-    'setLocalTextSearchQuery',
-    'setStickerSearchQuery',
-    'setGifSearchQuery',
-    'searchTextMessagesLocal',
-    'toggleManagement',
-    'openHistoryCalendar',
-    'addContact',
-  ]),
 )(RightHeader));

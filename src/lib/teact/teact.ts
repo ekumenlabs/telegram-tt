@@ -250,7 +250,7 @@ const DEBUG_components: AnyLiteral = {};
 
 document.addEventListener('dblclick', () => {
   // eslint-disable-next-line no-console
-  console.log('COMPONENTS', orderBy(Object.values(DEBUG_components), 'renderCount', 'desc'));
+  console.warn('COMPONENTS', orderBy(Object.values(DEBUG_components), 'renderCount', 'desc'));
 });
 
 export function renderComponent(componentInstance: ComponentInstance) {
@@ -588,18 +588,18 @@ function useLayoutEffectBase(
         }, []);
 
         // eslint-disable-next-line no-console
-        console.log(
-          '[Teact]',
-          debugKey,
-          'Effect caused by dependencies.',
-          causedBy.join(', '),
-        );
+        console.log(`[Teact] Effect "${debugKey}" caused by dependencies.`, causedBy.join(', '));
       }
 
       primarySchedulerFn(execCleanup);
       schedulerFn(exec);
     }
   } else {
+    if (debugKey) {
+      // eslint-disable-next-line no-console
+      console.log(`[Teact] Effect "${debugKey}" caused by missing dependencies.`);
+    }
+
     primarySchedulerFn(execCleanup);
     schedulerFn(exec);
   }

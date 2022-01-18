@@ -1,9 +1,9 @@
 import React, {
   FC, memo, useCallback, useEffect, useMemo, useState,
 } from '../../../lib/teact/teact';
-import { getGlobal, withGlobal } from '../../../lib/teact/teactn';
+import { getDispatch, getGlobal, withGlobal } from '../../../lib/teact/teactn';
 
-import { GlobalActions, MessageListType } from '../../../global/types';
+import { MessageListType } from '../../../global/types';
 import { ApiMessage } from '../../../api/types';
 import { IAlbum, IAnchorPosition } from '../../../types';
 import {
@@ -11,10 +11,10 @@ import {
   selectAllowedMessageActions,
   selectChat,
   selectCurrentMessageList,
+  selectIsMessageProtected,
 } from '../../../modules/selectors';
 import { isChatGroup, isOwnMessage } from '../../../modules/helpers';
 import { SEEN_BY_MEMBERS_EXPIRE, SEEN_BY_MEMBERS_CHAT_MAX } from '../../../config';
-import { pick } from '../../../util/iteratees';
 import { getDayStartAt } from '../../../util/dateFormat';
 import { copyTextToClipboard } from '../../../util/clipboard';
 import useShowTransition from '../../../hooks/useShowTransition';
@@ -58,14 +58,7 @@ type StateProps = {
   canShowSeenBy?: boolean;
 };
 
-type DispatchProps = Pick<GlobalActions, (
-  'setReplyingToId' | 'setEditingId' | 'pinMessage' | 'openForwardMenu' |
-  'faveSticker' | 'unfaveSticker' | 'toggleMessageSelection' | 'sendScheduledMessages' | 'rescheduleMessage' |
-  'downloadMessageMedia' | 'cancelMessageMediaDownload' | 'loadSeenBy' |
-  'openSeenByModal'
-)>;
-
-const ContextMenuContainer: FC<OwnProps & StateProps & DispatchProps> = ({
+const ContextMenuContainer: FC<OwnProps & StateProps> = ({
   isOpen,
   messageListType,
   chatUsername,
@@ -92,20 +85,23 @@ const ContextMenuContainer: FC<OwnProps & StateProps & DispatchProps> = ({
   canDownload,
   activeDownloads,
   canShowSeenBy,
-  setReplyingToId,
-  setEditingId,
-  pinMessage,
-  openForwardMenu,
-  faveSticker,
-  unfaveSticker,
-  toggleMessageSelection,
-  sendScheduledMessages,
-  rescheduleMessage,
-  downloadMessageMedia,
-  cancelMessageMediaDownload,
-  loadSeenBy,
-  openSeenByModal,
 }) => {
+  const {
+    setReplyingToId,
+    setEditingId,
+    pinMessage,
+    openForwardMenu,
+    faveSticker,
+    unfaveSticker,
+    toggleMessageSelection,
+    sendScheduledMessages,
+    rescheduleMessage,
+    downloadMessageMedia,
+    cancelMessageMediaDownload,
+    loadSeenBy,
+    openSeenByModal,
+  } = getDispatch();
+
   const { transitionClassNames } = useShowTransition(isOpen, onCloseAnimationEnd, undefined, false);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -371,6 +367,7 @@ export default memo(withGlobal<OwnProps>(
       && chat.membersCount
       && chat.membersCount < SEEN_BY_MEMBERS_CHAT_MAX
       && message.date > Date.now() / 1000 - SEEN_BY_MEMBERS_EXPIRE);
+    const isProtected = selectIsMessageProtected(global, message);
 
     return {
       noOptions,
@@ -382,30 +379,15 @@ export default memo(withGlobal<OwnProps>(
       canDelete,
       canReport,
       canEdit: !isPinned && canEdit,
-      canForward: !isScheduled && canForward,
+      canForward: !isProtected && !isScheduled && canForward,
       canFaveSticker: !isScheduled && canFaveSticker,
       canUnfaveSticker: !isScheduled && canUnfaveSticker,
-      canCopy,
-      canCopyLink: !isScheduled && canCopyLink,
+      canCopy: !isProtected && canCopy,
+      canCopyLink: !isProtected && !isScheduled && canCopyLink,
       canSelect,
-      canDownload,
+      canDownload: !isProtected && canDownload,
       activeDownloads,
       canShowSeenBy,
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, [
-    'setReplyingToId',
-    'setEditingId',
-    'pinMessage',
-    'openForwardMenu',
-    'faveSticker',
-    'unfaveSticker',
-    'toggleMessageSelection',
-    'sendScheduledMessages',
-    'rescheduleMessage',
-    'downloadMessageMedia',
-    'cancelMessageMediaDownload',
-    'loadSeenBy',
-    'openSeenByModal',
-  ]),
 )(ContextMenuContainer));

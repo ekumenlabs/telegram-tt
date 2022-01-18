@@ -1,11 +1,10 @@
 import React, {
   FC, memo, useCallback, useLayoutEffect, useMemo, useRef,
 } from '../../../lib/teact/teact';
-import { withGlobal } from '../../../lib/teact/teactn';
+import { getDispatch, withGlobal } from '../../../lib/teact/teactn';
 
 import useLang, { LangFn } from '../../../hooks/useLang';
 
-import { GlobalActions } from '../../../global/types';
 import {
   ApiChat, ApiUser, ApiMessage, ApiMessageOutgoingStatus, ApiFormattedText, MAIN_THREAD_ID, ApiUserStatus,
 } from '../../../api/types';
@@ -36,7 +35,6 @@ import { renderActionMessageText } from '../../common/helpers/renderActionMessag
 import renderText from '../../common/helpers/renderText';
 import { fastRaf } from '../../../util/schedulers';
 import buildClassName from '../../../util/buildClassName';
-import { pick } from '../../../util/iteratees';
 import useEnsureMessage from '../../../hooks/useEnsureMessage';
 import useChatContextActions from '../../../hooks/useChatContextActions';
 import useFlag from '../../../hooks/useFlag';
@@ -79,14 +77,13 @@ type StateProps = {
   animationLevel?: number;
   isSelected?: boolean;
   canScrollDown?: boolean;
+  canChangeFolder?: boolean;
   lastSyncTime?: number;
 };
 
-type DispatchProps = Pick<GlobalActions, 'openChat' | 'focusLastMessage'>;
-
 const ANIMATION_DURATION = 200;
 
-const Chat: FC<OwnProps & StateProps & DispatchProps> = ({
+const Chat: FC<OwnProps & StateProps> = ({
   style,
   chatId,
   folderId,
@@ -107,10 +104,14 @@ const Chat: FC<OwnProps & StateProps & DispatchProps> = ({
   animationLevel,
   isSelected,
   canScrollDown,
+  canChangeFolder,
   lastSyncTime,
-  openChat,
-  focusLastMessage,
 }) => {
+  const {
+    openChat,
+    focusLastMessage,
+  } = getDispatch();
+
   // eslint-disable-next-line no-null/no-null
   const ref = useRef<HTMLDivElement>(null);
 
@@ -204,6 +205,7 @@ const Chat: FC<OwnProps & StateProps & DispatchProps> = ({
     folderId,
     isPinned,
     isMuted,
+    canChangeFolder,
   });
 
   const lang = useLang();
@@ -377,6 +379,7 @@ export default memo(withGlobal<OwnProps>(
       animationLevel: global.settings.byKey.animationLevel,
       isSelected,
       canScrollDown: isSelected && messageListType === 'thread',
+      canChangeFolder: Boolean(global.chatFolders.orderedIds?.length),
       lastSyncTime: global.lastSyncTime,
       ...(isOutgoing && { lastMessageOutgoingStatus: selectOutgoingStatus(global, chat.lastMessage) }),
       ...(privateChatUserId && {
@@ -386,8 +389,4 @@ export default memo(withGlobal<OwnProps>(
       ...(actionTargetUserIds && { usersById }),
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, [
-    'openChat',
-    'focusLastMessage',
-  ]),
 )(Chat));

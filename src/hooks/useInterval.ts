@@ -1,25 +1,22 @@
-import { useEffect, useRef } from '../lib/teact/teact';
+import { useEffect, useLayoutEffect, useRef } from '../lib/teact/teact';
 
-export default function useInterval(
-  callback: Function,
-  delay: number | undefined,
-) {
-  const savedCallback = useRef<Function>(() => undefined);
+function useInterval(callback: NoneToVoidFunction, delay?: number, noFirst = false) {
+  const savedCallback = useRef(callback);
 
-  // Remember the latest callback.
-  useEffect(() => {
+  useLayoutEffect(() => {
     savedCallback.current = callback;
   }, [callback]);
 
-  // Set up the interval.
   useEffect(() => {
-    function tick() {
-      savedCallback.current();
+    if (delay === undefined) {
+      return undefined;
     }
-    if (delay !== undefined) {
-      const id = setInterval(tick, delay);
-      return () => clearInterval(id);
-    }
-    return () => {};
-  }, [delay]);
+
+    const id = setInterval(() => savedCallback.current(), delay);
+    if (!noFirst) savedCallback.current();
+
+    return () => clearInterval(id);
+  }, [delay, noFirst]);
 }
+
+export default useInterval;

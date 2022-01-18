@@ -9,6 +9,7 @@ import {
   ApiNewPoll,
   ApiOnProgress,
   ApiSticker,
+  ApiUser,
   ApiVideo,
   MAIN_THREAD_ID,
   MESSAGE_DELETED,
@@ -34,6 +35,7 @@ import {
   updateThreadInfos,
   updateChat,
   updateThreadUnreadFromForwardedMessage,
+  updateSponsoredMessage,
 } from '../../reducers';
 import {
   selectChat,
@@ -55,6 +57,9 @@ import {
   selectScheduledMessage,
   selectNoWebPage,
   selectFirstUnreadId,
+  selectUser,
+  selectSendAs,
+  selectSponsoredMessage,
 } from '../../selectors';
 import { debounce, rafPromise } from '../../../util/schedulers';
 import { isServiceNotificationMessage } from '../../helpers';
@@ -194,15 +199,16 @@ addReducer('sendMessage', (global, actions, payload) => {
 
   const chat = selectChat(global, chatId)!;
 
-  actions.setReplyingToId({ messageId: undefined });
-  actions.clearWebPagePreview({ chatId, threadId, value: false });
-
   const params = {
     ...payload,
     chat,
     replyingTo: selectReplyingToId(global, chatId, threadId),
     noWebPage: selectNoWebPage(global, chatId, threadId),
+    sendAs: selectSendAs(global, chatId),
   };
+
+  actions.setReplyingToId({ messageId: undefined });
+  actions.clearWebPagePreview({ chatId, threadId, value: false });
 
   const isSingle = !payload.attachments || payload.attachments.length <= 1;
   const isGrouped = !isSingle && payload.attachments && payload.attachments.length > 1;
@@ -459,6 +465,20 @@ addReducer('reportMessages', (global, actions, payload) => {
   })();
 });
 
+addReducer('sendMessageAction', (global, actions, payload) => {
+  (async () => {
+    const { action, chatId, threadId } = payload!;
+    if (chatId === global.currentUserId) return; // Message actions are disabled in Saved Messages
+
+    const chat = selectChat(global, chatId)!;
+    if (!chat) return;
+
+    await callApi('sendMessageAction', {
+      peer: chat, threadId, action,
+    });
+  })();
+});
+
 addReducer('markMessageListRead', (global, actions, payload) => {
   const { serverTimeOffset } = global;
   const currentMessageList = selectCurrentMessageList(global);
@@ -570,6 +590,7 @@ addReducer('forwardMessages', (global, action, payload) => {
   }
 
   const { isSilent, scheduledAt } = payload;
+  const sendAs = selectSendAs(global, toChatId!);
 
   const realMessages = messages.filter((m) => !isServiceNotificationMessage(m));
   if (realMessages.length) {
@@ -580,6 +601,7 @@ addReducer('forwardMessages', (global, action, payload) => {
       serverTimeOffset: getGlobal().serverTimeOffset,
       isSilent,
       scheduledAt,
+      sendAs,
     });
   }
 
@@ -597,6 +619,7 @@ addReducer('forwardMessages', (global, action, payload) => {
         poll,
         isSilent,
         scheduledAt,
+        sendAs,
       });
     });
 
@@ -837,6 +860,7 @@ async function sendMessage(params: {
   serverTimeOffset?: number;
   isSilent?: boolean;
   scheduledAt?: number;
+  sendAs?: ApiChat | ApiUser;
 }) {
   let localId: number | undefined;
   const progressCallback = params.attachment ? (progress: number, messageLocalId: number) => {
@@ -951,6 +975,51 @@ addReducer('loadSeenBy', (global, actions, payload) => {
   })();
 });
 
+addReducer('saveDefaultSendAs', (global, actions, payload) => {
+  const { chatId, sendAsId } = payload;
+  const chat = selectChat(global, chatId);
+  const sendAsChat = selectChat(global, sendAsId) || selectUser(global, sendAsId);
+  if (!chat || !sendAsChat) {
+    return undefined;
+  }
+
+  void callApi('saveDefaultSendAs', { sendAs: sendAsChat, chat });
+
+  return updateChat(global, chatId, {
+    fullInfo: {
+      ...chat.fullInfo,
+      sendAsId,
+    },
+  });
+});
+
+addReducer('loadSendAs', (global, actions, payload) => {
+  const { chatId } = payload;
+  const chat = selectChat(global, chatId);
+  if (!chat) {
+    return;
+  }
+
+  (async () => {
+    const result = await callApi('fetchSendAs', { chat });
+    if (!result) {
+      global = updateChat(global, chatId, {
+        sendAsIds: [],
+      });
+      setGlobal(global);
+      return;
+    }
+
+    global = getGlobal();
+    global = addUsers(global, buildCollectionByKey(result.users, 'id'));
+    global = addChats(global, buildCollectionByKey(result.chats, 'id'));
+    global = updateChat(global, chatId, {
+      sendAsIds: result.ids,
+    });
+    setGlobal(global);
+  })();
+});
+
 async function loadPinnedMessages(chat: ApiChat) {
   const result = await callApi('fetchPinnedMessages', { chat });
   if (!result) {
@@ -986,6 +1055,38 @@ async function loadScheduledHistory(chat: ApiChat) {
   global = replaceThreadParam(global, chat.id, MAIN_THREAD_ID, 'scheduledIds', ids);
   setGlobal(global);
 }
+
+addReducer('loadSponsoredMessages', (global, actions, payload) => {
+  const { chatId } = payload;
+  const chat = selectChat(global, chatId);
+  if (!chat) {
+    return;
+  }
+
+  (async () => {
+    const result = await callApi('fetchSponsoredMessages', { chat });
+    if (!result) {
+      return;
+    }
+
+    let newGlobal = updateSponsoredMessage(getGlobal(), chatId, result.messages[0]);
+    newGlobal = addUsers(newGlobal, buildCollectionByKey(result.users, 'id'));
+    newGlobal = addChats(newGlobal, buildCollectionByKey(result.chats, 'id'));
+
+    setGlobal(newGlobal);
+  })();
+});
+
+addReducer('viewSponsoredMessage', (global, actions, payload) => {
+  const { chatId } = payload;
+  const chat = selectChat(global, chatId);
+  const message = selectSponsoredMessage(global, chatId);
+  if (!chat || !message) {
+    return;
+  }
+
+  void callApi('viewSponsoredMessage', { chat, random: message.randomId });
+});
 
 function countSortedIds(ids: number[], from: number, to: number) {
   let count = 0;
