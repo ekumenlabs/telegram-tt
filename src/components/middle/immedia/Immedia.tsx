@@ -182,7 +182,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   // Sends a re-subscription when there are reconnections.
   useInterval(() => {
     subscribeUserId();
-  }, awareness && connected && userId === undefined ? WEBSOCKET_RECONNECTION_RATE : undefined);
+  }, awareness && connected && userId === undefined ? WEBSOCKET_RECONNECTION_RATE : undefined, true);
 
   const handleMessage = useCallback((data: any) => {
     const messageData = data.data;
