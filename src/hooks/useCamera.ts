@@ -2,7 +2,7 @@ import {
   useEffect, useState, useRef, useCallback,
 } from '../lib/teact/teact';
 
-const useCleanup = (val: HTMLVideoElement | undefined) => {
+const Cleanup = (val: HTMLVideoElement | undefined) => {
   const valRef = useRef(val);
   useEffect(() => {
     valRef.current = val;
@@ -19,7 +19,7 @@ const useCleanup = (val: HTMLVideoElement | undefined) => {
 
 const initializeCamera = () => navigator.mediaDevices.getUserMedia({ audio: false, video: true });
 
-export default function useCamera(videoRef: React.RefObject<HTMLVideoElement>) {
+export default function useCamera(videoRef: { current: HTMLVideoElement | null }) {
   const [isCameraInitialized, setIsCameraInitialized] = useState(false);
   const [video, setVideo] = useState<HTMLVideoElement | undefined>(undefined);
   const [error, setError] = useState('');
@@ -33,9 +33,12 @@ export default function useCamera(videoRef: React.RefObject<HTMLVideoElement>) {
     if (videoElement instanceof HTMLVideoElement) {
       setVideo(videoRef.current);
     }
-  }, [videoRef, video]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoRef.current, video]);
 
-  useCleanup(video);
+  useEffect(() => {
+    Cleanup(video);
+  }, [video]);
 
   const gotStream = useCallback((stream: MediaStream) => {
     if (!video) return;

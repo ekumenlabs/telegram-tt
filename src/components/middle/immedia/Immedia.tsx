@@ -1,5 +1,4 @@
 import SockJS from 'sockjs-client';
-import { createRef } from 'react';
 import React, {
   FC,
   useEffect,
@@ -64,7 +63,8 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const [connected, setConnected] = useState(false);
 
   const wsRef = useRef<WebSocket | undefined>(undefined);
-  const videoMeRef = createRef<HTMLVideoElement>();
+  // eslint-disable-next-line  no-null/no-null
+  const videoMeRef = useRef<HTMLVideoElement>(null);
   // eslint-disable-next-line  no-null/no-null
   const canvasMeRef = useRef<HTMLCanvasElement | null>(null);
   const { isCameraInitialized, video, error } = useCamera(videoMeRef);
