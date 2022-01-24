@@ -1,12 +1,12 @@
 import {
-  useEffect, useState, useRef, useCallback,
+  useEffect, useState, useCallback,
 } from '../lib/teact/teact';
 
-const Cleanup = (val: HTMLVideoElement | undefined) => {
-  const valRef = useRef(val);
+const Cleanup = (valRef: { current: HTMLVideoElement | null }, val: HTMLVideoElement | undefined) => {
   useEffect(() => {
+    if (!val) return;
     valRef.current = val;
-  }, [val]);
+  }, [val, valRef]);
 
   useEffect(() => {
     return () => {
@@ -14,7 +14,7 @@ const Cleanup = (val: HTMLVideoElement | undefined) => {
       // eslint-disable-next-line no-console
       console.log('clean up based on valRef.current: ', valRef.current);
     };
-  }, []);
+  }, [valRef]);
 };
 
 const initializeCamera = () => navigator.mediaDevices.getUserMedia({ audio: false, video: true });
@@ -37,8 +37,9 @@ export default function useCamera(videoRef: { current: HTMLVideoElement | null }
   }, [videoRef.current, video]);
 
   useEffect(() => {
-    Cleanup(video);
-  }, [video]);
+    Cleanup(videoRef, video);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoRef.current, video]);
 
   const gotStream = useCallback((stream: MediaStream) => {
     if (!video) return;
