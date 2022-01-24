@@ -67,7 +67,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const videoMeRef = useRef<HTMLVideoElement>(null);
   // eslint-disable-next-line  no-null/no-null
   const canvasMeRef = useRef<HTMLCanvasElement | null>(null);
-  const { isCameraInitialized, video, error } = useCamera(videoMeRef);
+  const { isCameraInitialized, video, error } = useCamera(videoMeRef, !awareness);
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 

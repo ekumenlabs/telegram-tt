@@ -19,7 +19,7 @@ const Cleanup = (valRef: { current: HTMLVideoElement | null }, val: HTMLVideoEle
 
 const initializeCamera = () => navigator.mediaDevices.getUserMedia({ audio: false, video: true });
 
-export default function useCamera(videoRef: { current: HTMLVideoElement | null }) {
+export default function useCamera(videoRef: { current: HTMLVideoElement | null }, reinitialize: boolean) {
   const [isCameraInitialized, setIsCameraInitialized] = useState(false);
   const [video, setVideo] = useState<HTMLVideoElement | undefined>(undefined);
   const [error, setError] = useState('');
@@ -40,6 +40,14 @@ export default function useCamera(videoRef: { current: HTMLVideoElement | null }
     Cleanup(videoRef, video);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoRef.current, video]);
+
+  useEffect(() => {
+    if (!reinitialize) return;
+
+    setVideo(undefined);
+    setIsCameraInitialized(false);
+    setError('');
+  }, [reinitialize]);
 
   const gotStream = useCallback((stream: MediaStream) => {
     if (!video) return;
