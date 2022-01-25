@@ -277,7 +277,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
         canvasMeRef.current.width,
         canvasMeRef.current.height,
       );
-      const dataURL = canvasMeRef.current.toDataURL('image/jpeg');
+      const dataURL = canvasMeRef.current.toDataURL();
       setLastSnapshot(dataURL);
     }
   };
