@@ -55,17 +55,25 @@
   text-align: center;
 }
 
-
 .enable-disable-awareness {
   position: absolute;
   top: 0;
   right: -9rem;
   z-index: var(--z-scroll-down-button);
-  width: fit-content;
+  width: max-content;
   text-transform: none;
-  transition: all 0.5s;
+
   &:hover {
     transform: translateX(-140px);
+    transition: transform 0.5s ease-in;
+  }
+
+  #Main.right-column-open & {
+    transform: translateX(calc(-1 * var(--right-column-width)));
+  }
+
+  #Main.right-column-open &:hover {
+    transform: translateX(calc(-1 * var(--right-column-width) - 140px));
     transition: transform 0.5s ease-in;
   }
 }
