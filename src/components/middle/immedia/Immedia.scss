@@ -33,6 +33,8 @@
   flex-direction: column;
   align-items: stretch;
   margin-bottom: 3px;
+  max-width: 70px;
+  overflow: hidden;
 }
 
 .participant-me {
