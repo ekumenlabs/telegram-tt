@@ -1,5 +1,9 @@
 # Telegram Web Z
 
+| **Deployment** |**Testing** |
+|:------------ |:------------ |
+| [![Deployment](https://img.shields.io/github/workflow/status/ekumenlabs/telegram-tt/Deploy%20to%20Github%20pages?style=for-the-badge&logo=githubactions)](https://webogram.ekumenlabs.com/) | [![Tests](https://img.shields.io/github/workflow/status/ekumenlabs/telegram-tt/Tests?style=for-the-badge&logo=testinglibrary)](https://github.com/ekumenlabs/telegram-tt/actions/workflows/tests.yml) |
+
 This project won the first prize 🥇 at [Telegram Lightweight Client Contest](https://contest.com/javascript-web-3) and now is an official Telegram client available to anyone at [web.telegram.org/z](https://web.telegram.org/z).
 
 According to the original contest rules, it has nearly zero dependencies and is fully based on its own [Teact](https://github.com/Ajaxy/telegram-tt/tree/master/src/lib/teact) framework (which re-implements React paradigm). It also uses a custom version of [GramJS](https://github.com/gram-js/gramjs) as an MTProto implementation.
