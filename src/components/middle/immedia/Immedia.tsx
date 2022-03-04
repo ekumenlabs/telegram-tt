@@ -361,7 +361,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   useInterval(() => {
     sendUpdate();
-  }, awareness && connected && userId ? UPDATE_RATE : undefined);
+  }, awareness && connected && userId && lastSnapshot ? UPDATE_RATE : undefined);
 
   // TODO: Define the Heartbeat function to keep track user connection.
   // Keep Track of connection status
