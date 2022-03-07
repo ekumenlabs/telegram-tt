@@ -9,7 +9,7 @@ import { buildInputPeer, generateRandomBigInt } from '../gramjsBuilders';
 import { buildApiUser } from '../apiBuilders/users';
 import { buildApiBotInlineMediaResult, buildApiBotInlineResult, buildBotSwitchPm } from '../apiBuilders/bots';
 import { buildApiChatFromPreview } from '../apiBuilders/chats';
-import { addUserToLocalDb } from '../helpers';
+import { addEntitiesWithPhotosToLocalDb, addUserToLocalDb, deserializeBytes } from '../helpers';
 
 export function init() {
 }
@@ -24,7 +24,7 @@ export function answerCallbackButton(
   return invokeRequest(new GramJs.messages.GetBotCallbackAnswer({
     peer: buildInputPeer(chatId, accessHash),
     msgId: messageId,
-    data: Buffer.from(data),
+    data: deserializeBytes(data),
   }));
 }
 
@@ -84,7 +84,7 @@ export async function fetchInlineBotResults({
     return undefined;
   }
 
-  result.users.map(addUserToLocalDb);
+  addEntitiesWithPhotosToLocalDb(result.users);
 
   return {
     isGallery: Boolean(result.gallery),
@@ -97,12 +97,13 @@ export async function fetchInlineBotResults({
 }
 
 export async function sendInlineBotResult({
-  chat, resultId, queryId, replyingTo,
+  chat, resultId, queryId, replyingTo, sendAs,
 }: {
   chat: ApiChat;
   resultId: string;
   queryId: string;
   replyingTo?: number;
+  sendAs?: ApiUser | ApiChat;
 }) {
   const randomId = generateRandomBigInt();
 
@@ -113,6 +114,7 @@ export async function sendInlineBotResult({
     peer: buildInputPeer(chat.id, chat.accessHash),
     id: resultId,
     ...(replyingTo && { replyToMsgId: replyingTo }),
+    ...(sendAs && { sendAs: buildInputPeer(sendAs.id, sendAs.accessHash) }),
   }), true);
 }
 

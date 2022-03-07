@@ -1,16 +1,13 @@
 import React, {
   FC, useEffect, useCallback, useMemo, memo,
 } from '../../../lib/teact/teact';
-import { withGlobal } from '../../../lib/teact/teactn';
+import { getDispatch, withGlobal } from '../../../lib/teact/teactn';
 
-import { GlobalActions } from '../../../global/types';
 import { ApiUser, ApiUserStatus } from '../../../api/types';
 
 import { IS_SINGLE_COLUMN_LAYOUT } from '../../../util/environment';
 import { throttle } from '../../../util/schedulers';
-import searchWords from '../../../util/searchWords';
-import { pick } from '../../../util/iteratees';
-import { getUserFullName, sortUserIds } from '../../../modules/helpers';
+import { filterUsersByName, sortUserIds } from '../../../modules/helpers';
 import useInfiniteScroll from '../../../hooks/useInfiniteScroll';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 
@@ -32,11 +29,9 @@ type StateProps = {
   serverTimeOffset: number;
 };
 
-type DispatchProps = Pick<GlobalActions, 'loadContactList' | 'openChat'>;
-
 const runThrottled = throttle((cb) => cb(), 60000, true);
 
-const ContactList: FC<OwnProps & StateProps & DispatchProps> = ({
+const ContactList: FC<OwnProps & StateProps> = ({
   isActive,
   filter,
   usersById,
@@ -44,9 +39,12 @@ const ContactList: FC<OwnProps & StateProps & DispatchProps> = ({
   contactIds,
   serverTimeOffset,
   onReset,
-  loadContactList,
-  openChat,
 }) => {
+  const {
+    loadContactList,
+    openChat,
+  } = getDispatch();
+
   // Due to the parent Transition, this component never gets unmounted,
   // that's why we use throttled API call on every update.
   useEffect(() => {
@@ -66,16 +64,9 @@ const ContactList: FC<OwnProps & StateProps & DispatchProps> = ({
       return undefined;
     }
 
-    const resultIds = filter ? contactIds.filter((id) => {
-      const user = usersById[id];
-      if (!user) {
-        return false;
-      }
-      const fullName = getUserFullName(user);
-      return fullName && searchWords(fullName, filter);
-    }) : contactIds;
+    const filteredIds = filterUsersByName(contactIds, usersById, filter);
 
-    return sortUserIds(resultIds, usersById, userStatusesById, undefined, serverTimeOffset);
+    return sortUserIds(filteredIds, usersById, userStatusesById, undefined, serverTimeOffset);
   }, [contactIds, filter, usersById, userStatusesById, serverTimeOffset]);
 
   const [viewportIds, getMore] = useInfiniteScroll(undefined, listIds, Boolean(filter));
@@ -116,5 +107,4 @@ export default memo(withGlobal<OwnProps>(
       serverTimeOffset: global.serverTimeOffset,
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, ['loadContactList', 'openChat']),
 )(ContactList));

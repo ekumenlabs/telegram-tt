@@ -1,15 +1,16 @@
 import React, {
   FC, memo, useCallback, useEffect, useMemo, useRef,
 } from '../../../lib/teact/teact';
-import { withGlobal } from '../../../lib/teact/teactn';
+import { getDispatch, withGlobal } from '../../../lib/teact/teactn';
 
 import { ApiChat, ApiChatFolder, ApiUser } from '../../../api/types';
-import { GlobalActions, GlobalState } from '../../../global/types';
+import { GlobalState } from '../../../global/types';
 import { NotifyException, NotifySettings, SettingsScreens } from '../../../types';
 import { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
 
 import { IS_TOUCH_ENV } from '../../../util/environment';
-import { buildCollectionByKey, pick } from '../../../util/iteratees';
+import { ALL_FOLDER_ID } from '../../../config';
+import { buildCollectionByKey } from '../../../util/iteratees';
 import { captureEvents, SwipeDirection } from '../../../util/captureEvents';
 import { getFolderUnreadDialogs } from '../../../modules/helpers';
 import { selectNotifyExceptions, selectNotifySettings } from '../../../modules/selectors';
@@ -43,12 +44,10 @@ type StateProps = {
   shouldSkipHistoryAnimations?: boolean;
 };
 
-type DispatchProps = Pick<GlobalActions, 'loadChatFolders' | 'setActiveChatFolder' | 'openChat'>;
-
 const INFO_THROTTLE = 3000;
 const SAVED_MESSAGES_HOTKEY = '0';
 
-const ChatFolders: FC<OwnProps & StateProps & DispatchProps> = ({
+const ChatFolders: FC<OwnProps & StateProps> = ({
   allListIds,
   chatsById,
   usersById,
@@ -62,10 +61,13 @@ const ChatFolders: FC<OwnProps & StateProps & DispatchProps> = ({
   shouldSkipHistoryAnimations,
   foldersDispatch,
   onScreenSelect,
-  loadChatFolders,
-  setActiveChatFolder,
-  openChat,
 }) => {
+  const {
+    loadChatFolders,
+    setActiveChatFolder,
+    openChat,
+  } = getDispatch();
+
   // eslint-disable-next-line no-null/no-null
   const transitionRef = useRef<HTMLDivElement>(null);
 
@@ -109,7 +111,7 @@ const ChatFolders: FC<OwnProps & StateProps & DispatchProps> = ({
     }
 
     return [
-      { title: lang.code === 'en' ? 'All' : lang('FilterAllChats') },
+      { title: lang.code === 'en' ? 'All' : lang('FilterAllChats'), id: ALL_FOLDER_ID },
       ...displayedFolders.map((folder) => ({
         title: folder.title,
         ...(folderCountersById?.[folder.id]),
@@ -195,7 +197,7 @@ const ChatFolders: FC<OwnProps & StateProps & DispatchProps> = ({
 
   function renderCurrentTab(isActive: boolean) {
     const activeFolder = Object.values(chatFoldersById)
-      .find(({ title }) => title === folderTabs![activeChatFolder].title);
+      .find(({ id }) => id === folderTabs![activeChatFolder].id);
 
     if (!activeFolder || activeChatFolder === 0) {
       return (
@@ -267,9 +269,4 @@ export default memo(withGlobal<OwnProps>(
       shouldSkipHistoryAnimations,
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, [
-    'loadChatFolders',
-    'setActiveChatFolder',
-    'openChat',
-  ]),
 )(ChatFolders));

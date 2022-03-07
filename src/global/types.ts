@@ -23,6 +23,7 @@ import {
   ApiCountryCode,
   ApiCountry,
   ApiGroupCall,
+  ApiSponsoredMessage,
 } from '../api/types';
 import {
   FocusDirection,
@@ -167,6 +168,7 @@ export type GlobalState = {
       poll?: ApiNewPoll;
       isSilent?: boolean;
     };
+    sponsoredByChatId: Record<string, ApiSponsoredMessage>;
   };
 
   groupCalls: {
@@ -494,7 +496,7 @@ export type ActionTypes = (
   'loadChatFolders' | 'loadRecommendedChatFolders' | 'editChatFolder' | 'addChatFolder' | 'deleteChatFolder' |
   'updateChat' | 'toggleSignatures' | 'loadGroupsForDiscussion' | 'linkDiscussionGroup' | 'unlinkDiscussionGroup' |
   'loadProfilePhotos' | 'loadMoreMembers' | 'setActiveChatFolder' | 'openNextChat' |
-  'addChatMembers' | 'deleteChatMember' | 'openPreviousChat' | 'editChatFolders' |
+  'addChatMembers' | 'deleteChatMember' | 'openPreviousChat' | 'editChatFolders' | 'toggleIsProtected' |
   // messages
   'loadViewportMessages' | 'selectMessage' | 'sendMessage' | 'cancelSendingMessage' | 'pinMessage' | 'deleteMessages' |
   'markMessageListRead' | 'markMessagesRead' | 'loadMessage' | 'focusMessage' | 'focusLastMessage' | 'sendPollVote' |
@@ -502,7 +504,8 @@ export type ActionTypes = (
   'openTelegramLink' | 'openChatByUsername' | 'requestThreadInfoUpdate' | 'setScrollOffset' | 'unpinAllMessages' |
   'setReplyingToId' | 'setEditingId' | 'editLastMessage' | 'saveDraft' | 'clearDraft' | 'loadPinnedMessages' |
   'toggleMessageWebPage' | 'replyToNextMessage' | 'deleteChatUser' | 'deleteChat' |
-  'reportMessages' | 'focusNextReply' | 'openChatByInvite' | 'loadSeenBy' |
+  'reportMessages' | 'sendMessageAction' | 'focusNextReply' | 'openChatByInvite' | 'loadSeenBy' |
+  'loadSponsoredMessages' | 'viewSponsoredMessage' | 'loadSendAs' | 'saveDefaultSendAs' |
   // downloads
   'downloadSelectedMessages' | 'downloadMessageMedia' | 'cancelMessageMediaDownload' |
   // scheduled messages
@@ -526,7 +529,7 @@ export type ActionTypes = (
   // users
   'loadFullUser' | 'openUserInfo' | 'loadNearestCountry' | 'loadTopUsers' | 'loadContactList' |
   'loadCurrentUser' | 'updateProfile' | 'checkUsername' | 'addContact' | 'updateContact' |
-  'deleteUser' | 'loadUser' | 'setUserSearchQuery' | 'loadCommonChats' |
+  'deleteContact' | 'loadUser' | 'setUserSearchQuery' | 'loadCommonChats' |
   // chat creation
   'createChannel' | 'createGroupChat' | 'resetChatCreation' |
   // settings

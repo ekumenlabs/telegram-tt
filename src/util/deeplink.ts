@@ -29,7 +29,7 @@ export const processDeepLink = (url: string) => {
   switch (method) {
     case 'resolve': {
       const {
-        domain, post, comment, voicechat, livestream,
+        domain, post, comment, voicechat, livestream, start,
       } = params;
 
       if (domain !== 'telegrampassport') {
@@ -43,6 +43,7 @@ export const processDeepLink = (url: string) => {
             username: domain,
             messageId: Number(post),
             commentId: Number(comment),
+            startParam: start,
           });
         }
       }
@@ -54,7 +55,7 @@ export const processDeepLink = (url: string) => {
       } = params;
 
       focusMessage({
-        chatId: -Number(channel),
+        chatId: `-${channel}`,
         id: post,
       });
       break;

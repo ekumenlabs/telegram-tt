@@ -6,9 +6,9 @@ import React, {
   useMemo,
   useRef,
 } from '../../../lib/teact/teact';
-import { withGlobal } from '../../../lib/teact/teactn';
+import { getDispatch, withGlobal } from '../../../lib/teact/teactn';
 
-import { GlobalActions, MessageListType } from '../../../global/types';
+import { MessageListType } from '../../../global/types';
 import {
   ApiMessage,
   ApiMessageOutgoingStatus,
@@ -22,7 +22,6 @@ import {
 } from '../../../types';
 
 import { IS_ANDROID, IS_TOUCH_ENV } from '../../../util/environment';
-import { pick } from '../../../util/iteratees';
 import {
   selectChat,
   selectChatMessage,
@@ -46,6 +45,7 @@ import {
   selectAllowedMessageActions,
   selectIsDownloading,
   selectThreadInfo,
+  selectIsMessageProtected,
 } from '../../../modules/selectors';
 import {
   getMessageContent,
@@ -139,6 +139,7 @@ type StateProps = {
   replyMessageSender?: ApiUser | ApiChat;
   outgoingStatus?: ApiMessageOutgoingStatus;
   uploadProgress?: number;
+  isProtected?: boolean;
   isFocused?: boolean;
   focusDirection?: FocusDirection;
   noFocusHighlight?: boolean;
@@ -165,10 +166,6 @@ type StateProps = {
   threadInfo?: ApiThreadInfo;
 };
 
-type DispatchProps = Pick<GlobalActions, (
-  'toggleMessageSelection' | 'clickInlineButton' | 'disableContextMenuHint' | 'openChat'
-)>;
-
 const NBSP = '\u00A0';
 const GROUP_MESSAGE_HOVER_ATTRIBUTE = 'data-is-document-group-hover';
 // eslint-disable-next-line max-len
@@ -178,7 +175,7 @@ const APPENDIX_NOT_OWN = { __html: '<svg width="9" height="20" xmlns="http://www
 const APPEARANCE_DELAY = 10;
 const NO_MEDIA_CORNERS_THRESHOLD = 18;
 
-const Message: FC<OwnProps & StateProps & DispatchProps> = ({
+const Message: FC<OwnProps & StateProps> = ({
   message,
   chatUsername,
   observeIntersectionForBottom,
@@ -206,6 +203,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
   replyMessageSender,
   outgoingStatus,
   uploadProgress,
+  isProtected,
   isFocused,
   focusDirection,
   noFocusHighlight,
@@ -230,11 +228,13 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
   shouldLoopStickers,
   autoLoadFileMaxSizeMb,
   threadInfo,
-  toggleMessageSelection,
-  clickInlineButton,
-  disableContextMenuHint,
-  openChat,
 }) => {
+  const {
+    toggleMessageSelection,
+    clickInlineButton,
+    disableContextMenuHint,
+  } = getDispatch();
+
   // eslint-disable-next-line no-null/no-null
   const ref = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line no-null/no-null
@@ -274,20 +274,24 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
   const isScheduled = messageListType === 'scheduled' || message.isScheduled;
   const hasReply = isReplyMessage(message) && !shouldHideReply;
   const hasThread = Boolean(threadInfo) && messageListType === 'thread';
+  const customShape = getMessageCustomShape(message);
   const { forwardInfo, viaBotId } = message;
   const asForwarded = (
-    forwardInfo && (!isChatWithSelf || isScheduled) && !isRepliesChat && !forwardInfo.isLinkedChannelPost
+    forwardInfo
+    && (!isChatWithSelf || isScheduled)
+    && !isRepliesChat
+    && !forwardInfo.isLinkedChannelPost
+    && !customShape
   );
   const isInDocumentGroup = Boolean(message.groupedId) && !message.isInAlbum;
   const isAlbum = Boolean(album) && album!.messages.length > 1;
   const {
     text, photo, video, audio, voice, document, sticker, contact, poll, webPage, invoice,
   } = getMessageContent(message);
-  const customShape = getMessageCustomShape(message);
   const textParts = renderMessageText(message, highlight, isEmojiOnlyMessage(customShape));
   const isContextMenuShown = contextMenuPosition !== undefined;
   const signature = (
-    (isChannel && message.adminTitle) || (forwardInfo && !asForwarded && forwardInfo.adminTitle) || undefined
+    (isChannel && message.adminTitle) || (!asForwarded && forwardInfo?.adminTitle) || undefined
   );
   const metaSafeAuthorWidth = useMemo(() => {
     return signature ? calculateAuthorWidth(signature) : undefined;
@@ -328,6 +332,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
     isAlbum,
     Boolean(isInSelectMode),
     Boolean(canReply),
+    Boolean(isProtected),
     onContextMenu,
     handleBeforeContextMenu,
   );
@@ -356,7 +361,8 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
     chatId,
     threadId,
     isInDocumentGroup,
-    Boolean(isScheduled),
+    asForwarded,
+    isScheduled,
     isRepliesChat,
     album,
     avatarPeer,
@@ -367,6 +373,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
   const containerClassName = buildClassName(
     'Message message-list-item',
     isFirstInGroup && 'first-in-group',
+    isProtected && 'is-protected',
     isLastInGroup && 'last-in-group',
     isFirstInDocumentGroup && 'first-in-document-group',
     isLastInDocumentGroup && 'last-in-document-group',
@@ -470,7 +477,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
   function renderContent() {
     const className = buildClassName(
       'content-inner',
-      asForwarded && !customShape && 'forwarded-message',
+      asForwarded && 'forwarded-message',
       hasReply && 'reply-message',
       noMediaCorners && 'no-media-corners',
     );
@@ -488,6 +495,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
         {hasReply && (
           <EmbeddedMessage
             message={replyMessage}
+            isProtected={isProtected}
             sender={replyMessageSender}
             observeIntersection={observeIntersectionForMedia}
             onClick={handleReplyClick}
@@ -517,6 +525,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
             albumLayout={albumLayout!}
             observeIntersection={observeIntersectionForMedia}
             isOwn={isOwn}
+            isProtected={isProtected}
             hasCustomAppendix={hasCustomAppendix}
             lastSyncTime={lastSyncTime}
             onMediaClick={handleAlbumMediaClick}
@@ -533,6 +542,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
             onClick={handleMediaClick}
             onCancelUpload={handleCancelUpload}
             isDownloading={isDownloading}
+            isProtected={isProtected}
             theme={theme}
           />
         )}
@@ -557,6 +567,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
             onClick={handleMediaClick}
             onCancelUpload={handleCancelUpload}
             isDownloading={isDownloading}
+            isProtected={isProtected}
           />
         )}
         {(audio || voice) && (
@@ -618,6 +629,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
             onMediaClick={handleMediaClick}
             onCancelMediaTransfer={handleCancelUpload}
             isDownloading={isDownloading}
+            isProtected={isProtected}
             theme={theme}
           />
         )}
@@ -727,7 +739,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
           style={style}
           dir="auto"
         >
-          {asForwarded && !customShape && (!isInDocumentGroup || isFirstInDocumentGroup) && (
+          {asForwarded && (!isInDocumentGroup || isFirstInDocumentGroup) && (
             <div className="message-title">{lang('ForwardedMessage')}</div>
           )}
           {renderContent()}
@@ -762,7 +774,7 @@ const Message: FC<OwnProps & StateProps & DispatchProps> = ({
               <i className="icon-arrow-right" />
             </Button>
           ) : undefined}
-          {withCommentButton && <CommentButton threadInfo={threadInfo!} disabled={noComments} openChat={openChat} />}
+          {withCommentButton && <CommentButton threadInfo={threadInfo!} disabled={noComments} />}
           {withAppendix && (
             <div className="svg-appendix" dangerouslySetInnerHTML={isOwn ? APPENDIX_OWN : APPENDIX_NOT_OWN} />
           )}
@@ -883,6 +895,7 @@ export default memo(withGlobal<OwnProps>(
       isThreadTop,
       replyMessage,
       replyMessageSender,
+      isProtected: selectIsMessageProtected(global, message),
       isFocused,
       isForwarding,
       isChatWithSelf,
@@ -911,10 +924,4 @@ export default memo(withGlobal<OwnProps>(
       ...(isFocused && { focusDirection, noFocusHighlight, isResizingContainer }),
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, [
-    'toggleMessageSelection',
-    'clickInlineButton',
-    'disableContextMenuHint',
-    'openChat',
-  ]),
 )(Message));

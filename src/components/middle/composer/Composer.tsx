@@ -1,9 +1,9 @@
 import React, {
   FC, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from '../../../lib/teact/teact';
-import { withGlobal } from '../../../lib/teact/teactn';
+import { getDispatch, withGlobal } from '../../../lib/teact/teactn';
 
-import { GlobalActions, GlobalState, MessageListType } from '../../../global/types';
+import { GlobalState, MessageListType } from '../../../global/types';
 import {
   ApiAttachment,
   ApiBotInlineResult,
@@ -22,7 +22,7 @@ import {
 import { InlineBotSettings } from '../../../types';
 
 import {
-  BASE_EMOJI_KEYWORD_LANG, EDITABLE_INPUT_ID, REPLIES_USER_ID, SCHEDULED_WHEN_ONLINE,
+  BASE_EMOJI_KEYWORD_LANG, EDITABLE_INPUT_ID, REPLIES_USER_ID, SCHEDULED_WHEN_ONLINE, SEND_MESSAGE_ACTION_INTERVAL,
 } from '../../../config';
 import { IS_VOICE_RECORDING_SUPPORTED, IS_SINGLE_COLUMN_LAYOUT, IS_IOS } from '../../../util/environment';
 import {
@@ -44,6 +44,7 @@ import {
   getChatSlowModeOptions,
   isUserId,
   isChatAdmin,
+  isChatSuperGroup,
 } from '../../../modules/helpers';
 import { formatMediaDuration, formatVoiceRecordDuration, getDayStartAt } from '../../../util/dateFormat';
 import focusEditableElement from '../../../util/focusEditableElement';
@@ -52,7 +53,6 @@ import buildAttachment from './helpers/buildAttachment';
 import renderText from '../../common/helpers/renderText';
 import insertHtmlInSelection from '../../../util/insertHtmlInSelection';
 import deleteLastCharacterOutsideSelection from '../../../util/deleteLastCharacterOutsideSelection';
-import { pick } from '../../../util/iteratees';
 import buildClassName from '../../../util/buildClassName';
 import windowSize from '../../../util/windowSize';
 import { isSelectionInsideInput } from './helpers/selection';
@@ -60,16 +60,19 @@ import applyIosAutoCapitalizationFix from './helpers/applyIosAutoCapitalizationF
 import { getServerTime } from '../../../util/serverTime';
 
 import useFlag from '../../../hooks/useFlag';
+import usePrevious from '../../../hooks/usePrevious';
+import useStickerTooltip from './hooks/useStickerTooltip';
+import useContextMenuHandlers from '../../../hooks/useContextMenuHandlers';
+import useLang from '../../../hooks/useLang';
+import useSendMessageAction from '../../../hooks/useSendMessageAction';
+import useInterval from '../../../hooks/useInterval';
+import useOnChange from '../../../hooks/useOnChange';
 import useVoiceRecording from './hooks/useVoiceRecording';
 import useClipboardPaste from './hooks/useClipboardPaste';
 import useDraft from './hooks/useDraft';
 import useEditing from './hooks/useEditing';
-import usePrevious from '../../../hooks/usePrevious';
-import useStickerTooltip from './hooks/useStickerTooltip';
 import useEmojiTooltip from './hooks/useEmojiTooltip';
 import useMentionTooltip from './hooks/useMentionTooltip';
-import useContextMenuHandlers from '../../../hooks/useContextMenuHandlers';
-import useLang from '../../../hooks/useLang';
 import useInlineBotTooltip from './hooks/useInlineBotTooltip';
 import useBotCommandTooltip from './hooks/useBotCommandTooltip';
 
@@ -95,6 +98,8 @@ import DropArea, { DropAreaState } from './DropArea.async';
 import WebPagePreview from './WebPagePreview';
 import Portal from '../../ui/Portal';
 import CalendarModal from '../../common/CalendarModal.async';
+import SendAsMenu from './SendAsMenu.async';
+import Avatar from '../../common/Avatar';
 
 import './Composer.scss';
 
@@ -139,15 +144,11 @@ type StateProps =
     inlineBots?: Record<string, false | InlineBotSettings>;
     botCommands?: ApiBotCommand[] | false;
     chatBotCommands?: ApiBotCommand[];
+    sendAsUser?: ApiUser;
+    sendAsChat?: ApiChat;
+    sendAsId?: string;
   }
   & Pick<GlobalState, 'connectionState'>;
-
-type DispatchProps = Pick<GlobalActions, (
-  'sendMessage' | 'editMessage' | 'saveDraft' | 'forwardMessages' |
-  'clearDraft' | 'showDialog' | 'setStickerSearchQuery' | 'setGifSearchQuery' |
-  'openPollModal' | 'closePollModal' | 'loadScheduledHistory' | 'openChat' |
-  'addRecentEmoji' | 'sendInlineBotResult'
-)>;
 
 enum MainButtonState {
   Send = 'send',
@@ -167,7 +168,7 @@ const SENDING_ANIMATION_DURATION = 350;
 // eslint-disable-next-line max-len
 const APPENDIX = '<svg width="9" height="20" xmlns="http://www.w3.org/2000/svg"><defs><filter x="-50%" y="-14.7%" width="200%" height="141.2%" filterUnits="objectBoundingBox" id="a"><feOffset dy="1" in="SourceAlpha" result="shadowOffsetOuter1"/><feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1"/><feColorMatrix values="0 0 0 0 0.0621962482 0 0 0 0 0.138574144 0 0 0 0 0.185037364 0 0 0 0.15 0" in="shadowBlurOuter1"/></filter></defs><g fill="none" fill-rule="evenodd"><path d="M6 17H0V0c.193 2.84.876 5.767 2.05 8.782.904 2.325 2.446 4.485 4.625 6.48A1 1 0 016 17z" fill="#000" filter="url(#a)"/><path d="M6 17H0V0c.193 2.84.876 5.767 2.05 8.782.904 2.325 2.446 4.485 4.625 6.48A1 1 0 016 17z" fill="#FFF" class="corner"/></g></svg>';
 
-const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
+const Composer: FC<OwnProps & StateProps> = ({
   dropAreaState,
   shouldSchedule,
   canScheduleUntilOnline,
@@ -205,21 +206,25 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
   isInlineBotLoading,
   botCommands,
   chatBotCommands,
-  sendMessage,
-  editMessage,
-  saveDraft,
-  clearDraft,
-  showDialog,
-  setStickerSearchQuery,
-  setGifSearchQuery,
-  forwardMessages,
-  openPollModal,
-  closePollModal,
-  loadScheduledHistory,
-  openChat,
-  addRecentEmoji,
-  sendInlineBotResult,
+  sendAsUser,
+  sendAsChat,
+  sendAsId,
 }) => {
+  const {
+    sendMessage,
+    clearDraft,
+    showDialog,
+    setStickerSearchQuery,
+    setGifSearchQuery,
+    forwardMessages,
+    openPollModal,
+    closePollModal,
+    loadScheduledHistory,
+    openChat,
+    addRecentEmoji,
+    sendInlineBotResult,
+    loadSendAs,
+  } = getDispatch();
   const lang = useLang();
 
   // eslint-disable-next-line no-null/no-null
@@ -232,6 +237,8 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
     scheduledMessageArgs, setScheduledMessageArgs,
   ] = useState<GlobalState['messages']['contentToBeScheduled'] | undefined>();
   const { width: windowWidth } = windowSize.get();
+  const sendAsIds = chat?.sendAsIds;
+  const sendMessageAction = useSendMessageAction(chatId, threadId);
 
   // Cache for frequently updated state
   const htmlRef = useRef<string>(html);
@@ -248,6 +255,18 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
       loadScheduledHistory({ chatId });
     }
   }, [isReady, chatId, loadScheduledHistory, lastSyncTime, threadId]);
+
+  useEffect(() => {
+    if (chatId && chat && lastSyncTime && !sendAsIds && isReady && isChatSuperGroup(chat)) {
+      loadSendAs({ chatId });
+    }
+  }, [chat, chatId, isReady, lastSyncTime, loadSendAs, sendAsIds]);
+
+  const shouldAnimateSendAsButtonRef = useRef(false);
+  useOnChange(([prevChatId, prevSendAsIds]) => {
+    // We only animate send-as button if `sendAsIds` was missing when opening the chat
+    shouldAnimateSendAsButtonRef.current = Boolean(chatId === prevChatId && sendAsIds && !prevSendAsIds);
+  }, [chatId, sendAsIds]);
 
   useLayoutEffect(() => {
     if (!appendixRef.current) return;
@@ -268,6 +287,7 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
   const [isBotCommandMenuOpen, openBotCommandMenu, closeBotCommandMenu] = useFlag();
   const [isAttachMenuOpen, openAttachMenu, closeAttachMenu] = useFlag();
   const [isSymbolMenuOpen, openSymbolMenu, closeSymbolMenu] = useFlag();
+  const [isSendAsMenuOpen, openSendAsMenu, closeSendAsMenu] = useFlag();
   const [isDeleteModalOpen, openDeleteModal, closeDeleteModal] = useFlag();
   const [isSymbolMenuLoaded, onSymbolMenuLoadingComplete] = useFlag();
   const [isHoverDisabled, disableHover, enableHover] = useFlag();
@@ -281,6 +301,16 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
     recordButtonRef: mainButtonRef,
     startRecordTimeRef,
   } = useVoiceRecording();
+
+  useInterval(() => {
+    sendMessageAction({ type: 'recordAudio' });
+  }, activeVoiceRecording && SEND_MESSAGE_ACTION_INTERVAL);
+
+  useEffect(() => {
+    if (!activeVoiceRecording) {
+      sendMessageAction({ type: 'cancel' });
+    }
+  }, [activeVoiceRecording, sendMessageAction]);
 
   const mainButtonState = editingMessage
     ? MainButtonState.Edit
@@ -299,7 +329,6 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
     groupChatMembers,
     topInlineBotIds,
     currentUserId,
-    usersById,
   );
 
   const {
@@ -429,8 +458,8 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
     };
   }, [chatId, resetComposer, stopRecordingVoiceRef]);
 
-  const handleEditComplete = useEditing(htmlRef, setHtml, editingMessage, resetComposer, openDeleteModal, editMessage);
-  useDraft(draft, chatId, threadId, html, htmlRef, setHtml, editingMessage, saveDraft, clearDraft);
+  const handleEditComplete = useEditing(htmlRef, setHtml, editingMessage, resetComposer, openDeleteModal);
+  useDraft(draft, chatId, threadId, html, htmlRef, setHtml, editingMessage);
   useClipboardPaste(insertTextAndUpdateCursor, setAttachments, editingMessage);
 
   const handleFileSelect = useCallback(async (files: File[], isQuick: boolean) => {
@@ -561,8 +590,9 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
 
   const handleActivateSymbolMenu = useCallback(() => {
     closeBotCommandMenu();
+    closeSendAsMenu();
     openSymbolMenu();
-  }, [closeBotCommandMenu, openSymbolMenu]);
+  }, [closeBotCommandMenu, closeSendAsMenu, openSymbolMenu]);
 
   const handleStickerSelect = useCallback((sticker: ApiSticker, shouldPreserveInput = false) => {
     sticker = {
@@ -695,6 +725,24 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
       openSymbolMenu();
     }, MOBILE_KEYBOARD_HIDE_DELAY_MS);
   }, [openSymbolMenu, closeBotCommandMenu]);
+
+  const handleSendAsMenuOpen = useCallback(() => {
+    const messageInput = document.getElementById(EDITABLE_INPUT_ID)!;
+
+    if (!IS_SINGLE_COLUMN_LAYOUT || messageInput !== document.activeElement) {
+      closeBotCommandMenu();
+      closeSymbolMenu();
+      openSendAsMenu();
+      return;
+    }
+
+    messageInput.blur();
+    setTimeout(() => {
+      closeBotCommandMenu();
+      closeSymbolMenu();
+      openSendAsMenu();
+    }, MOBILE_KEYBOARD_HIDE_DELAY_MS);
+  }, [closeBotCommandMenu, closeSymbolMenu, openSendAsMenu]);
 
   const handleAllScheduledClick = useCallback(() => {
     openChat({ id: chatId, threadId, type: 'scheduled' });
@@ -829,6 +877,13 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
           message={renderedEditedMessage}
         />
       )}
+      <SendAsMenu
+        isOpen={isSendAsMenuOpen}
+        onClose={closeSendAsMenu}
+        chatId={chatId}
+        selectedSendAsId={sendAsId}
+        sendAsIds={sendAsIds}
+      />
       <MentionTooltip
         isOpen={isMentionTooltipOpen}
         onClose={closeMentionTooltip}
@@ -875,6 +930,21 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
             >
               <i className="icon-bot-commands-filled" />
             </ResponsiveHoverButton>
+          )}
+          {!!sendAsIds?.length && (sendAsUser || sendAsChat) && (
+            <Button
+              round
+              color="translucent"
+              onClick={isSendAsMenuOpen ? closeSendAsMenu : handleSendAsMenuOpen}
+              ariaLabel={lang('SendMessageAsTitle')}
+              className={buildClassName('send-as-button', shouldAnimateSendAsButtonRef.current && 'appear-animation')}
+            >
+              <Avatar
+                user={sendAsUser}
+                chat={sendAsChat}
+                size="tiny"
+              />
+            </Button>
           )}
           {IS_SINGLE_COLUMN_LAYOUT ? (
             <Button
@@ -960,6 +1030,8 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
             </span>
           )}
           <StickerTooltip
+            chatId={chatId}
+            threadId={threadId}
             isOpen={isStickerTooltipOpen}
             onStickerSelect={handleStickerSelect}
           />
@@ -992,6 +1064,8 @@ const Composer: FC<OwnProps & StateProps & DispatchProps> = ({
             />
           )}
           <SymbolMenu
+            chatId={chatId}
+            threadId={threadId}
             isOpen={isSymbolMenuOpen}
             allowedAttachmentOptions={allowedAttachmentOptions}
             onLoad={onSymbolMenuLoadingComplete}
@@ -1070,6 +1144,12 @@ export default memo(withGlobal<OwnProps>(
     const emojiKeywords = language !== BASE_EMOJI_KEYWORD_LANG ? global.emojiKeywords[language] : undefined;
     const botKeyboardMessageId = messageWithActualBotKeyboard ? messageWithActualBotKeyboard.id : undefined;
     const keyboardMessage = botKeyboardMessageId ? selectChatMessage(global, chatId, botKeyboardMessageId) : undefined;
+    const usersById = global.users.byId;
+    const chatsById = global.chats.byId;
+    const { currentUserId } = global;
+    const sendAsId = chat?.fullInfo ? chat?.fullInfo?.sendAsId || currentUserId : undefined;
+    const sendAsUser = sendAsId ? usersById?.[sendAsId] : undefined;
+    const sendAsChat = !sendAsUser && sendAsId ? chatsById?.[sendAsId] : undefined;
 
     return {
       editingMessage: selectEditingMessage(global, chatId, threadId, messageListType),
@@ -1097,8 +1177,8 @@ export default memo(withGlobal<OwnProps>(
       stickersForEmoji: global.stickers.forEmoji.stickers,
       groupChatMembers: chat?.fullInfo?.members,
       topInlineBotIds: global.topInlineBots?.userIds,
-      currentUserId: global.currentUserId,
-      usersById: global.users.byId,
+      currentUserId,
+      usersById,
       lastSyncTime: global.lastSyncTime,
       contentToBeScheduled: global.messages.contentToBeScheduled,
       shouldSuggestStickers,
@@ -1110,22 +1190,9 @@ export default memo(withGlobal<OwnProps>(
       isInlineBotLoading: global.inlineBots.isLoading,
       chatBotCommands: chat && chat.fullInfo && chat.fullInfo.botCommands,
       botCommands: chatBot && chatBot.fullInfo ? (chatBot.fullInfo.botCommands || false) : undefined,
+      sendAsUser,
+      sendAsChat,
+      sendAsId,
     };
   },
-  (setGlobal, actions): DispatchProps => pick(actions, [
-    'sendMessage',
-    'editMessage',
-    'saveDraft',
-    'clearDraft',
-    'showDialog',
-    'setStickerSearchQuery',
-    'setGifSearchQuery',
-    'forwardMessages',
-    'openPollModal',
-    'closePollModal',
-    'loadScheduledHistory',
-    'openChat',
-    'addRecentEmoji',
-    'sendInlineBotResult',
-  ]),
 )(Composer));

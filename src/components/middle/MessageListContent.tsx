@@ -15,9 +15,12 @@ import useScrollHooks from './hooks/useScrollHooks';
 import useMessageObservers from './hooks/useMessageObservers';
 
 import Message from './message/Message';
+import SponsoredMessage from './message/SponsoredMessage';
 import ActionMessage from './ActionMessage';
+import { getDispatch } from '../../lib/teact/teactn';
 
 interface OwnProps {
+  chatId: string;
   messageIds: number[];
   messageGroups: MessageDateGroup[];
   isViewportNewest: boolean;
@@ -31,18 +34,20 @@ interface OwnProps {
   threadId: number;
   type: MessageListType;
   isReady: boolean;
+  isScrollingRef: { current: boolean | undefined };
+  isScrollPatchNeededRef: { current: boolean | undefined };
   threadTopMessageId: number | undefined;
   hasLinkedChat: boolean | undefined;
   isSchedule: boolean;
   noAppearanceAnimation: boolean;
   onFabToggle: AnyToVoidFunction;
   onNotchToggle: AnyToVoidFunction;
-  openHistoryCalendar: Function;
 }
 
 const UNREAD_DIVIDER_CLASS = 'unread-divider';
 
 const MessageListContent: FC<OwnProps> = ({
+  chatId,
   messageIds,
   messageGroups,
   isViewportNewest,
@@ -56,14 +61,17 @@ const MessageListContent: FC<OwnProps> = ({
   threadId,
   type,
   isReady,
+  isScrollingRef,
+  isScrollPatchNeededRef,
   threadTopMessageId,
   hasLinkedChat,
   isSchedule,
   noAppearanceAnimation,
   onFabToggle,
   onNotchToggle,
-  openHistoryCalendar,
 }) => {
+  const { openHistoryCalendar } = getDispatch();
+
   const {
     observeIntersectionForMedia,
     observeIntersectionForReading,
@@ -83,6 +91,8 @@ const MessageListContent: FC<OwnProps> = ({
     onFabToggle,
     onNotchToggle,
     isReady,
+    isScrollingRef,
+    isScrollPatchNeededRef,
   );
 
   const lang = useLang();
@@ -229,6 +239,7 @@ const MessageListContent: FC<OwnProps> = ({
     <div className="messages-container" teactFastList>
       <div ref={backwardsTriggerRef} key="backwards-trigger" className="backwards-trigger" />
       {flatten(dateGroups)}
+      {isViewportNewest && <SponsoredMessage key={chatId} chatId={chatId} containerRef={containerRef} />}
       <div
         ref={forwardsTriggerRef}
         key="forwards-trigger"

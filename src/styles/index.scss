@@ -14,8 +14,11 @@ html, body {
   margin: 0;
   padding: 0;
   font-size: 16px;
-  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Helvetica Neue", sans-serif;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Segoe UI", Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   color: var(--color-text);
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -32,11 +35,11 @@ body.is-macos {
 
 html[lang=fa],
 html[lang=fa] body {
-  font-family: "Vazir", "Roboto", -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Helvetica Neue", sans-serif;
+  font-family: "Vazir", "Roboto", -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Segoe UI", Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 
   &.is-ios,
   &.is-macos {
-    font-family: "Vazir", -apple-system, BlinkMacSystemFont, "Roboto", "Apple Color Emoji", "Helvetica Neue", sans-serif;
+    font-family: "Vazir", -apple-system, BlinkMacSystemFont, "Roboto", "Apple Color Emoji", "Segoe UI", Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   }
 }
 
@@ -81,9 +84,9 @@ body.cursor-ew-resize {
   display: none;
   position: absolute;
   top: 0;
-  right: -.1875rem;
+  right: -.25rem;
   bottom: 0;
-  width: .1875rem;
+  width: .25rem;
   z-index: var(--z-resize-handle);
   cursor: ew-resize;
 
@@ -220,6 +223,15 @@ div[role="button"] {
 
 .text-muted {
   color: var(--color-text-secondary) !important;
+}
+
+.protector {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
 }
 
 .for-ios-autocapitalization-fix {

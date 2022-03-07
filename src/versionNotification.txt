@@ -1,21 +1,20 @@
-**Telegram Web Z was updated to version alpha 1.25**
+**Telegram Web Z was updated to version 1.28**
 
 👏 **Harder**
-• Brand new Media Viewer for touch screens with swipe, pinch, double-tap and pan gestures.
-• Read receipts are available for your messages in groups.
-• Join Group, Subscribe to Channel and Start Bot buttons are now shown on mobile screens.
-• Added support for wide screens up to 4K.
-• More accessibility support.
+• Support for join requests in groups and channels.
+• Support for more service messages.
 
 🤩 **Better**
-• Context menus are more compact.
-• Animations adjust to be more native on various devices.
-• Several UI improvements.
-
-🚀 **Faster**
-• Slide transitions and context menus were drastically optimized.
-• UI effects are faster and more efficient.
+• Easier to select and adjust left column width.
+• Redundant single quotes removed in Spanish and French translations.
+• Support for hotkeys on non-qwerty keyboards.
+• Use Ctrl+Shift+F or Ctrl+F (in PWA mode) to open global or local search.
+• Chat: "Add to folder..." only appears for users with folders.
+• Support for `start` parameter in `tg://resolve` links.
 
 💪 **Stronger**
-• Deep links properly open in Safari.
-• Increased protocol security.
+• Fixed focusing on messages in a chat that was previously open.
+• Fixed missing stickers in sticker suggestions.
+• Fixed opening chats from user mentions.
+• Fixed various glitches when appearing as a channel in public groups.
+• Removed redundant download and forward options in chats with protected content.
