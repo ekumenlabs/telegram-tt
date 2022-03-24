@@ -27,6 +27,7 @@ import {
 } from './constants';
 
 import useInterval from '../../../hooks/useInterval';
+import useCamera from '../../../hooks/useCamera';
 
 import { formatRoom } from './helpers';
 
@@ -63,9 +64,10 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   const wsRef = useRef<WebSocket | undefined>(undefined);
   // eslint-disable-next-line  no-null/no-null
-  const canvasMeRef = useRef<HTMLCanvasElement | null>(null);
+  const videoMeRef = useRef<HTMLVideoElement>(null);
   // eslint-disable-next-line  no-null/no-null
-  const videoMeRef = useRef<HTMLVideoElement | null>(null);
+  const canvasMeRef = useRef<HTMLCanvasElement | null>(null);
+  const { isCameraInitialized, video, error } = useCamera(videoMeRef, !awareness);
 
   const isParticipantPresent = (id: string) => participants.some((p) => p.id === id);
 
@@ -149,14 +151,6 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
     setLastSnapshot(undefined);
     setUserId(undefined);
     setRoomId(undefined);
-    // TODO: Check how to clean up tracks when user changes chats
-    // FIX: Sometimes it works (i.e., disable webcam light), sometimes it doesn't.
-    if (videoMeRef.current) {
-      if (videoMeRef.current.srcObject) {
-        const tracks = (videoMeRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach((track) => track.stop());
-      }
-    }
   };
 
   useEffect(() => {
@@ -230,7 +224,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   }, [currentUser]);
 
   const enableAwareness = () => {
-    if (wsRef.current) {
+    if (connected) {
       // eslint-disable-next-line no-console
       console.log(INIT, 'Enabled Awareness');
       subscribeUserId();
@@ -241,84 +235,63 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
   const disableAwareness = () => {
     // eslint-disable-next-line no-console
     console.log(INIT, 'Disabled Awareness');
-    if (wsRef.current && userId !== undefined) unsubscribeUserId();
+    if (connected && userId !== undefined) unsubscribeUserId();
     cleanUp();
   };
 
+  const getParticipantsSnapshots = useCallback(() => {
+    // update each participant's snapshot
+    participants.forEach((participant) => {
+      // eslint-disable-next-line no-console
+      console.log(INIT, 'Getting snapshot for', participant);
+      const canvas = document.getElementById(
+        `canvas-${participant.id}`,
+      ) as HTMLCanvasElement;
+      if (canvas) {
+        const context = canvas.getContext('2d');
+        const image = new Image();
+        image.onload = () => {
+          context?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        };
+        if (participant.image) image.src = participant.image;
+      }
+    });
+  }, [participants]);
+
   useEffect(() => {
-    const getParticipantsSnapshots = () => {
-      // update each participant's snapshot
-      participants.forEach((participant) => {
-        // eslint-disable-next-line no-console
-        console.log(INIT, 'Getting snapshot for', participant);
-        const canvas = document.getElementById(
-          `canvas-${participant.id}`,
-        ) as HTMLCanvasElement;
-        if (canvas) {
-          const context = canvas.getContext('2d');
-          const image = new Image();
-          image.onload = () => {
-            context?.drawImage(image, 0, 0, canvas.width, canvas.height);
-          };
-          if (participant.image) image.src = participant.image;
-        }
-      });
-    };
     if (awareness && participants.length) getParticipantsSnapshots();
-  }, [participants, awareness]);
+  }, [participants, awareness, getParticipantsSnapshots]);
 
   const getSnapshotVideo = () => {
-    if (canvasMeRef.current) {
+    // scale the canvas accordingly
+    if (video && canvasMeRef.current) {
       const context = canvasMeRef.current.getContext('2d');
-
-      const cbk = (stream: MediaStream) => {
-        if (videoMeRef.current && context) {
-          videoMeRef.current.srcObject = stream;
-          // Wait some time beacuse the video is not ready
-          // FIX: Maybe there's a better way to do this.
-          // TRY: https://developer.mozilla.org/en-US/docs/Web/API/ImageCapture/ImageCapture
-          setTimeout(() => {
-            const video = videoMeRef.current;
-            const canvas = canvasMeRef.current;
-            // eslint-disable-next-line  no-null/no-null
-            if (video === null || canvas === null) return;
-            // show snapshot
-            context.drawImage(
-              video,
-              160,
-              120,
-              360,
-              240,
-              0,
-              0,
-              canvas.width,
-              canvas.height,
-            );
-            const image = canvas.toDataURL();
-            setLastSnapshot(image);
-          }, SNAPSHOT_RATE / 5);
-        }
-      };
-
-      if (navigator.mediaDevices.getUserMedia) {
-        // TODO: Rewrite using async/await
-        navigator.mediaDevices
-          .getUserMedia({ video: true, audio: false })
-          .then((stream) => cbk(stream))
-          .catch((err) => {
-            // eslint-disable-next-line no-console
-            console.error(err);
-          });
-      } else {
-        // eslint-disable-next-line no-console
-        console.error(new Error(`${INIT}There is no user media`));
-      }
+      context?.drawImage(
+        video,
+        160,
+        120,
+        360,
+        240,
+        0,
+        0,
+        canvasMeRef.current.width,
+        canvasMeRef.current.height,
+      );
+      const dataURL = canvasMeRef.current.toDataURL();
+      setLastSnapshot(dataURL);
     }
   };
 
   useInterval(() => {
     getSnapshotVideo();
-  }, awareness ? SNAPSHOT_RATE : undefined);
+  }, isCameraInitialized ? SNAPSHOT_RATE : undefined);
+
+  useEffect(() => {
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error(`${INIT} Camera initialization error: ${error}`);
+    }
+  }, [error]);
 
   // GC that runs every GC_RATE seconds and checks if, for each participant,
   // their last snapshot was taken inside a REMOVE_THRESHOLD seconds time frame.
@@ -334,7 +307,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
 
   useInterval(() => {
     updateParticipants();
-  }, awareness && wsRef.current !== undefined ? GC_RATE : undefined);
+  }, awareness && connected ? GC_RATE : undefined);
 
   const sendUpdate = useCallback(() => {
     const currentMessageId = messageId + 1;
@@ -403,6 +376,7 @@ const Immedia: FC<OwnProps & StateProps> = ({ chatId, currentUser }) => {
                 <track kind="captions" />
               </video>
               <canvas
+                id="canvas-me"
                 ref={canvasMeRef}
                 className="photo-canvas"
                 width="70"
